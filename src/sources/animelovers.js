@@ -218,7 +218,18 @@ export async function getEpisodeStreamByTitle(anilistData, epNum) {
   let query = "";
   const titlesToSearch = (typeof anilistData === 'object' && anilistData.titles) ? anilistData.titles.slice(0, 3) : [anilistData];
   
+  let searchQueries = [];
   for (const t of titlesToSearch) {
+    if (!t) continue;
+    searchQueries.push(t);
+    // Tambahkan variasi tanpa (YYYY) atau (TV)
+    const stripped = t.replace(/\s*\(\d{4}\)\s*/g, '').replace(/\s*\(TV\)\s*/gi, '').trim();
+    if (stripped !== t && !searchQueries.includes(stripped)) {
+      searchQueries.push(stripped);
+    }
+  }
+
+  for (const t of searchQueries) {
     if (!t) continue;
     query = t;
     results = await searchAnimelovers(query);
@@ -277,7 +288,17 @@ export async function getEpisodesByTitle(anilistData) {
   let query = "";
   const titlesToSearch = (typeof anilistData === 'object' && anilistData.titles) ? anilistData.titles.slice(0, 3) : [anilistData];
   
+  let searchQueries = [];
   for (const t of titlesToSearch) {
+    if (!t) continue;
+    searchQueries.push(t);
+    const stripped = t.replace(/\s*\(\d{4}\)\s*/g, '').replace(/\s*\(TV\)\s*/gi, '').trim();
+    if (stripped !== t && !searchQueries.includes(stripped)) {
+      searchQueries.push(stripped);
+    }
+  }
+
+  for (const t of searchQueries) {
     if (!t) continue;
     query = t;
     results = await searchAnimelovers(query);
