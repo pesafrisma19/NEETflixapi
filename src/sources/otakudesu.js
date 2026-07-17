@@ -73,6 +73,21 @@ export async function getInfoOtakudesu(id) {
     const $ = cheerio.load(res.data);
     
     const title = $('.venser .fotoanime .infozin .infozingle p').first().text().replace('Judul: ', '').trim() || $('.jdlrx h1').text().trim();
+    const image = $('.venser .fotoanime img').attr('src');
+    const synopsis = $('.venser .fotoanime .sinopc p').toArray().map(el => $(el).text().trim()).join('\n');
+    
+    // Parse info details
+    const info = {};
+    $('.venser .fotoanime .infozin .infozingle p').each((i, el) => {
+      const text = $(el).text().trim();
+      const splitIndex = text.indexOf(':');
+      if (splitIndex > -1) {
+        const key = text.substring(0, splitIndex).trim().toLowerCase();
+        const value = text.substring(splitIndex + 1).trim();
+        info[key] = value;
+      }
+    });
+
     const episodes = [];
     
     $('.episodelist ul li').each((i, el) => {
@@ -106,6 +121,14 @@ export async function getInfoOtakudesu(id) {
     return {
       id,
       title,
+      image,
+      synopsis,
+      status: info['status'] || '',
+      releaseDate: info['tanggal rilis'] || '',
+      genres: (info['genre'] || '').split(',').map(s => s.trim()).filter(Boolean),
+      type: info['tipe'] || '',
+      studio: info['studio'] || '',
+      score: info['skor'] || '',
       episodes
     };
   } catch (error) {
@@ -264,12 +287,16 @@ function calculateMatchScore(anilistData, candidate) {
 
   // 2. YEAR MATCH (Max 20)
   const aYearData = anilistData.year || anilistData.seasonYear;
-  if (aYearData && candidate.releaseYear) {
-    const cYear = parseInt(candidate.releaseYear);
-    const aYear = parseInt(aYearData);
-    if (cYear === aYear) score += 20;
-    else if (Math.abs(cYear - aYear) === 1) score += 10;
-    else score -= 20;
+  if (aYearData && (candidate.releaseDate || candidate.releaseYear)) {
+    const cDateStr = candidate.releaseDate || candidate.releaseYear;
+    const cYearMatch = String(cDateStr).match(/\\d{4}/);
+    if (cYearMatch) {
+      const cYear = parseInt(cYearMatch[0], 10);
+      const aYear = parseInt(aYearData, 10);
+      if (cYear === aYear) score += 20;
+      else if (Math.abs(cYear - aYear) === 1) score += 10;
+      else score -= 20;
+    }
   }
 
   // 3. FORMAT MATCH (Max 15)
@@ -354,24 +381,36 @@ export async function getEpisodesByTitle(anilistData) {
   const candidates = scored.filter(s => s.score >= minAcceptable);
   if (candidates.length === 0) candidates.push(scored[0]);
 
+  // GET INFO AND RE-SCORE (Two-pass matching)
+  const detailedCandidates = [];
   for (const candidate of candidates.slice(0, 3)) {
     try {
       const info = await getInfoOtakudesu(candidate.id);
       if (!info.episodes || info.episodes.length === 0) continue;
-      return {
-        animeId: candidate.id,
-        animeTitle: info.title,
-        totalEpisodes: info.episodes.length,
-        episodes: info.episodes.map(ep => ({
-          number: ep.episodeNumber,
-          id: ep.id
-        })).sort((a, b) => Number(a.number) - Number(b.number))
-      };
+      
+      const finalScore = (typeof anilistData === 'object') ? calculateMatchScore(anilistData, info) : candidate.score;
+      detailedCandidates.push({ info, finalScore });
     } catch (err) {
       console.warn(`[OD:episodes] Error for "${candidate.id}":`, err.message);
     }
   }
-  throw new Error(`Episode list tidak ditemukan untuk "${query}" di Otakudesu`);
+
+  if (detailedCandidates.length === 0) {
+    throw new Error(`Episode list tidak ditemukan untuk "${query}" di Otakudesu`);
+  }
+
+  detailedCandidates.sort((a, b) => b.finalScore - a.finalScore);
+  const best = detailedCandidates[0].info;
+
+  return {
+    animeId: best.id,
+    animeTitle: best.title,
+    totalEpisodes: best.episodes.length,
+    episodes: best.episodes.map(ep => ({
+      number: ep.episodeNumber,
+      id: ep.id
+    })).sort((a, b) => Number(a.number) - Number(b.number))
+  };
 }
 
 export async function getEpisodeStreamByTitle(anilistData, epNum) {
@@ -416,24 +455,34 @@ export async function getEpisodeStreamByTitle(anilistData, epNum) {
   const candidates = scored.filter(s => s.score >= minAcceptable);
   if (candidates.length === 0) candidates.push(scored[0]);
 
-  let lastError = null;
+  // GET INFO AND RE-SCORE (Two-pass matching)
+  const detailedCandidates = [];
   for (const candidate of candidates.slice(0, 3)) {
     try {
       const info = await getInfoOtakudesu(candidate.id);
       if (!info.episodes || info.episodes.length === 0) continue;
+      
       const targetEp = info.episodes.find(ep => String(ep.episodeNumber) === String(epNum))
         ?? (String(epNum) === '1' && info.episodes.length === 1 ? info.episodes[0] : null)
         ?? (String(epNum) === '1' ? info.episodes.find(ep => /^(movie|ova|special|film)/i.test(String(ep.episodeNumber))) : null);
-      if (!targetEp) {
-        lastError = `Episode ${epNum} tidak ada di "${candidate.id}"`;
-        continue;
-      }
-      console.log(`[OD:stream] ✅ Found at "${candidate.id}" episode ${epNum}`);
-      const stream = await getStreamOtakudesu(targetEp.id);
-      return { animeId: candidate.id, animeTitle: info.title, episodeId: targetEp.id, sources: stream.sources };
+      
+      if (!targetEp) continue;
+
+      const finalScore = (typeof anilistData === 'object') ? calculateMatchScore(anilistData, info) : candidate.score;
+      detailedCandidates.push({ info, targetEp, finalScore });
     } catch (err) {
-      lastError = err.message;
+      console.warn(`[OD:stream] Error for "${candidate.id}":`, err.message);
     }
   }
-  throw new Error(lastError || `Episode ${epNum} tidak ditemukan untuk "${query}" di Otakudesu`);
+
+  if (detailedCandidates.length === 0) {
+    throw new Error(`Episode ${epNum} tidak ditemukan untuk "${query}" di Otakudesu`);
+  }
+
+  detailedCandidates.sort((a, b) => b.finalScore - a.finalScore);
+  const best = detailedCandidates[0];
+
+  console.log(`[OD:stream] ✅ Found at "${best.info.id}" episode ${epNum} (Final Score: ${best.finalScore})`);
+  const stream = await getStreamOtakudesu(best.targetEp.id);
+  return { animeId: best.info.id, animeTitle: best.info.title, episodeId: best.targetEp.id, sources: stream.sources };
 }

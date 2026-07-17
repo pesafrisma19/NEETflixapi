@@ -1,281 +1,635 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>NEETflixapi - Dashboard</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0d0d14; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-    header { background: #13131f; border-bottom: 1px solid #2a2a3d; padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
-    header h1 { font-size: 20px; color: #fff; }
-    .badge { color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 20px; }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 6px #22c55e; animation: pulse 2s infinite; margin-left: auto; }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    body {
+      background: #0d0d14;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #13131f;
+      border-bottom: 1px solid #2a2a3d;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    header h1 {
+      font-size: 20px;
+      color: #fff;
+    }
+
+    .badge {
+      color: #fff;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 6px #22c55e;
+      animation: pulse 2s infinite;
+      margin-left: auto;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .4
+      }
+    }
 
     /* SOURCE TABS */
-    .source-tabs { background: #0f0f1a; border-bottom: 1px solid #2a2a3d; display: flex; align-items: center; padding: 0 16px; gap: 4px; overflow-x: auto; }
+    .source-tabs {
+      background: #0f0f1a;
+      border-bottom: 1px solid #2a2a3d;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 4px;
+      overflow-x: auto;
+    }
+
     .source-tab {
-      display: flex; align-items: center; gap: 8px;
-      padding: 12px 16px; border: none; background: none;
-      color: #666; font-size: 13px; cursor: pointer;
-      border-bottom: 2px solid transparent; transition: all 0.15s;
-      white-space: nowrap; position: relative;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      border: none;
+      background: none;
+      color: #666;
+      font-size: 13px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+      white-space: nowrap;
+      position: relative;
     }
-    .source-tab:hover { color: #ccc; }
-    .source-tab.active { color: #fff; border-bottom-color: var(--accent); }
-    .source-tab .src-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+
+    .source-tab:hover {
+      color: #ccc;
+    }
+
+    .source-tab.active {
+      color: #fff;
+      border-bottom-color: var(--accent);
+    }
+
+    .source-tab .src-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
     .source-tab .src-status {
-      font-size: 9px; padding: 1px 5px; border-radius: 10px; font-weight: 600;
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 10px;
+      font-weight: 600;
     }
-    .src-status.ready { background: #052e16; color: #22c55e; }
-    .src-status.wip { background: #1c1007; color: #f59e0b; }
-    .src-status.planned { background: #1a1a2e; color: #555; }
+
+    .src-status.ready {
+      background: #052e16;
+      color: #22c55e;
+    }
+
+    .src-status.wip {
+      background: #1c1007;
+      color: #f59e0b;
+    }
+
+    .src-status.planned {
+      background: #1a1a2e;
+      color: #555;
+    }
 
     .add-source-btn {
-      margin-left: auto; padding: 6px 12px; background: #1e1e2e;
-      border: 1px dashed #2a2a3d; color: #555; border-radius: 6px;
-      cursor: pointer; font-size: 12px; transition: 0.15s; white-space: nowrap;
+      margin-left: auto;
+      padding: 6px 12px;
+      background: #1e1e2e;
+      border: 1px dashed #2a2a3d;
+      color: #555;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: 0.15s;
+      white-space: nowrap;
     }
-    .add-source-btn:hover { border-color: #7c3aed; color: #a78bfa; }
+
+    .add-source-btn:hover {
+      border-color: #7c3aed;
+      color: #a78bfa;
+    }
 
     /* LAYOUT */
-    .container { display: grid; grid-template-columns: 260px 1fr; height: calc(100vh - 105px); }
+    .container {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      height: calc(100vh - 105px);
+    }
 
     /* SIDEBAR */
-    .sidebar { background: #13131f; border-right: 1px solid #2a2a3d; overflow-y: auto; }
-
-    .source-info { padding: 16px; border-bottom: 1px solid #2a2a3d; }
-    .source-info h3 { font-size: 14px; color: #fff; margin-bottom: 4px; }
-    .source-info p { font-size: 11px; color: #555; line-height: 1.5; }
-    .source-info .base-url { font-size: 11px; color: #7c3aed; font-family: monospace; margin-top: 6px; word-break: break-all; }
-
-    .sidebar-section { margin-bottom: 4px; }
-    .sidebar-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #444; padding: 10px 16px 4px; }
-    .endpoint-btn {
-      display: flex; align-items: center; gap: 10px;
-      width: 100%; padding: 9px 16px; background: none; border: none;
-      color: #888; font-size: 12.5px; cursor: pointer; text-align: left;
-      transition: all 0.15s; border-left: 3px solid transparent;
+    .sidebar {
+      background: #13131f;
+      border-right: 1px solid #2a2a3d;
+      overflow-y: auto;
     }
-    .endpoint-btn:hover { background: #1e1e2e; color: #fff; }
-    .endpoint-btn.active { background: #1e1e2e; color: #a78bfa; border-left-color: var(--accent, #7c3aed); }
-    .endpoint-btn .method { font-size: 9px; font-weight: 700; color: #22c55e; background: #052e16; padding: 2px 5px; border-radius: 3px; min-width: 28px; text-align: center; }
-    .endpoint-btn.disabled { opacity: 0.35; pointer-events: none; }
 
-    .wip-note { margin: 8px 16px; padding: 12px; background: #1c1007; border: 1px solid #3d2007; border-radius: 8px; font-size: 12px; color: #f59e0b; line-height: 1.5; }
-    .planned-note { margin: 8px 16px; padding: 12px; background: #0d0d18; border: 1px dashed #2a2a3d; border-radius: 8px; font-size: 12px; color: #555; line-height: 1.5; }
+    .source-info {
+      padding: 16px;
+      border-bottom: 1px solid #2a2a3d;
+    }
+
+    .source-info h3 {
+      font-size: 14px;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .source-info p {
+      font-size: 11px;
+      color: #555;
+      line-height: 1.5;
+    }
+
+    .source-info .base-url {
+      font-size: 11px;
+      color: #7c3aed;
+      font-family: monospace;
+      margin-top: 6px;
+      word-break: break-all;
+    }
+
+    .sidebar-section {
+      margin-bottom: 4px;
+    }
+
+    .sidebar-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #444;
+      padding: 10px 16px 4px;
+    }
+
+    .endpoint-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 9px 16px;
+      background: none;
+      border: none;
+      color: #888;
+      font-size: 12.5px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+      border-left: 3px solid transparent;
+    }
+
+    .endpoint-btn:hover {
+      background: #1e1e2e;
+      color: #fff;
+    }
+
+    .endpoint-btn.active {
+      background: #1e1e2e;
+      color: #a78bfa;
+      border-left-color: var(--accent, #7c3aed);
+    }
+
+    .endpoint-btn .method {
+      font-size: 9px;
+      font-weight: 700;
+      color: #22c55e;
+      background: #052e16;
+      padding: 2px 5px;
+      border-radius: 3px;
+      min-width: 28px;
+      text-align: center;
+    }
+
+    .endpoint-btn.disabled {
+      opacity: 0.35;
+      pointer-events: none;
+    }
+
+    .wip-note {
+      margin: 8px 16px;
+      padding: 12px;
+      background: #1c1007;
+      border: 1px solid #3d2007;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #f59e0b;
+      line-height: 1.5;
+    }
+
+    .planned-note {
+      margin: 8px 16px;
+      padding: 12px;
+      background: #0d0d18;
+      border: 1px dashed #2a2a3d;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #555;
+      line-height: 1.5;
+    }
 
     /* MAIN PANEL */
-    .main { display: flex; flex-direction: column; overflow: hidden; }
-    .url-bar { background: #13131f; border-bottom: 1px solid #2a2a3d; padding: 14px 16px; display: flex; gap: 10px; align-items: center; }
-    .url-bar input { flex: 1; background: #0d0d14; border: 1px solid #2a2a3d; color: #fff; padding: 9px 12px; border-radius: 7px; font-size: 13px; font-family: monospace; }
-    .url-bar input:focus { outline: none; border-color: #7c3aed; }
-    .send-btn { background: #7c3aed; color: #fff; border: none; padding: 9px 18px; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.15s; }
-    .send-btn:hover { background: #6d28d9; }
-    .send-btn.loading { background: #3b1f7a; pointer-events: none; }
+    .main {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
 
-    .params-bar { background: #13131f; border-bottom: 1px solid #2a2a3d; padding: 10px 16px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; min-height: 48px; }
-    .param-group { display: flex; align-items: center; gap: 6px; }
-    .params-bar label { font-size: 11px; color: #555; }
-    .param-input { background: #0d0d14; border: 1px solid #2a2a3d; color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-family: monospace; min-width: 160px; }
-    .param-input:focus { outline: none; border-color: #7c3aed; }
+    .url-bar {
+      background: #13131f;
+      border-bottom: 1px solid #2a2a3d;
+      padding: 14px 16px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
 
-    .response-area { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
-    .response-header { padding: 10px 16px; display: flex; align-items: center; gap: 10px; background: #0f0f1a; border-bottom: 1px solid #2a2a3d; }
-    .status-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
-    .status-200 { background: #052e16; color: #22c55e; }
-    .status-err { background: #2d0a0a; color: #ef4444; }
-    .time-badge { background: #1e1e2e; color: #a78bfa; font-size: 11px; padding: 2px 8px; border-radius: 20px; }
+    .url-bar input {
+      flex: 1;
+      background: #0d0d14;
+      border: 1px solid #2a2a3d;
+      color: #fff;
+      padding: 9px 12px;
+      border-radius: 7px;
+      font-size: 13px;
+      font-family: monospace;
+    }
 
-    pre { flex: 1; overflow: auto; padding: 18px; font-size: 12px; font-family: monospace; line-height: 1.6; color: #c9d1d9; background: #0d0d14; }
-    .placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 10px; color: #333; }
+    .url-bar input:focus {
+      outline: none;
+      border-color: #7c3aed;
+    }
+
+    .send-btn {
+      background: #7c3aed;
+      color: #fff;
+      border: none;
+      padding: 9px 18px;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.15s;
+    }
+
+    .send-btn:hover {
+      background: #6d28d9;
+    }
+
+    .send-btn.loading {
+      background: #3b1f7a;
+      pointer-events: none;
+    }
+
+    .params-bar {
+      background: #13131f;
+      border-bottom: 1px solid #2a2a3d;
+      padding: 10px 16px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      min-height: 48px;
+    }
+
+    .param-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .params-bar label {
+      font-size: 11px;
+      color: #555;
+    }
+
+    .param-input {
+      background: #0d0d14;
+      border: 1px solid #2a2a3d;
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: monospace;
+      min-width: 160px;
+    }
+
+    .param-input:focus {
+      outline: none;
+      border-color: #7c3aed;
+    }
+
+    .response-area {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .response-header {
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #0f0f1a;
+      border-bottom: 1px solid #2a2a3d;
+    }
+
+    .status-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+
+    .status-200 {
+      background: #052e16;
+      color: #22c55e;
+    }
+
+    .status-err {
+      background: #2d0a0a;
+      color: #ef4444;
+    }
+
+    .time-badge {
+      background: #1e1e2e;
+      color: #a78bfa;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+
+    pre {
+      flex: 1;
+      overflow: auto;
+      padding: 18px;
+      font-size: 12px;
+      font-family: monospace;
+      line-height: 1.6;
+      color: #c9d1d9;
+      background: #0d0d14;
+    }
+
+    .placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 10px;
+      color: #333;
+    }
   </style>
 </head>
+
 <body>
 
-<header>
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-  <h1>NEETflixapi</h1>
-  <span class="badge" style="background:#1e1e2e;color:#888;">Multi-Source</span>
-  <div class="status-dot" title="Server Running" style="margin-left:auto;"></div>
-</header>
+  <header>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2">
+      <polyline points="16 18 22 12 16 6" />
+      <polyline points="8 6 2 12 8 18" />
+    </svg>
+    <h1>NEETflixapi</h1>
+    <span class="badge" style="background:#1e1e2e;color:#888;">Multi-Source</span>
+    <div class="status-dot" title="Server Running" style="margin-left:auto;"></div>
+  </header>
 
-<!-- SOURCE TABS -->
-<div class="source-tabs" id="sourceTabs">
-  <button class="source-tab active" style="--accent:#a855f7" onclick="switchSource('animelovers')" id="tab-animelovers">
-    <div class="src-dot" style="background:#a855f7"></div>
-    AnimeLovers
-    <span class="src-status ready">Ready</span>
-  </button>
-  <button class="source-tab" style="--accent:#06b6d4" onclick="switchSource('hianime')" id="tab-hianime">
-    <div class="src-dot" style="background:#06b6d4"></div>
-    HiAnime
-    <span class="src-status ready">Ready</span>
-  </button>
-  <button class="source-tab" style="--accent:#f97316" onclick="switchSource('otakudesu')" id="tab-otakudesu">
-    <div class="src-dot" style="background:#f97316"></div>
-    Otakudesu
-    <span class="src-status ready">Ready</span>
-  </button>
-  <button class="source-tab" style="--accent:#22c55e" onclick="switchSource('gogoanime')" id="tab-gogoanime">
-    <div class="src-dot" style="background:#22c55e"></div>
-    Gogoanime
-    <span class="src-status planned">Planned</span>
-  </button>
-  <button class="source-tab" style="--accent:#ec4899" onclick="switchSource('animasu')" id="tab-animasu">
-    <div class="src-dot" style="background:#ec4899"></div>
-    Animasu
-    <span class="src-status planned">Planned</span>
-  </button>
-  <button class="add-source-btn">+ Tambah Sumber</button>
-</div>
-
-<div class="container">
-  <!-- SIDEBAR -->
-  <div class="sidebar" id="sidebar">
-    <!-- Diisi JS -->
+  <!-- SOURCE TABS -->
+  <div class="source-tabs" id="sourceTabs">
+    <button class="source-tab active" style="--accent:#a855f7" onclick="switchSource('animelovers')"
+      id="tab-animelovers">
+      <div class="src-dot" style="background:#a855f7"></div>
+      AnimeLovers
+      <span class="src-status ready">Ready</span>
+    </button>
+    <button class="source-tab" style="--accent:#06b6d4" onclick="switchSource('hianime')" id="tab-hianime">
+      <div class="src-dot" style="background:#06b6d4"></div>
+      HiAnime
+      <span class="src-status ready">Ready</span>
+    </button>
+    <button class="source-tab" style="--accent:#f97316" onclick="switchSource('otakudesu')" id="tab-otakudesu">
+      <div class="src-dot" style="background:#f97316"></div>
+      Otakudesu
+      <span class="src-status ready">Ready</span>
+    </button>
+    <button class="source-tab" style="--accent:#22c55e" onclick="switchSource('gogoanime')" id="tab-gogoanime">
+      <div class="src-dot" style="background:#22c55e"></div>
+      Gogoanime
+      <span class="src-status planned">Planned</span>
+    </button>
+    <button class="source-tab" style="--accent:#ec4899" onclick="switchSource('animasu')" id="tab-animasu">
+      <div class="src-dot" style="background:#ec4899"></div>
+      Animasu
+      <span class="src-status planned">Planned</span>
+    </button>
+    <button class="add-source-btn">+ Tambah Sumber</button>
   </div>
 
-  <!-- MAIN PANEL -->
-  <div class="main">
-    <div class="url-bar">
-      <span style="color:#22c55e;font-weight:700;font-size:13px;min-width:28px;">GET</span>
-      <input type="text" id="urlInput" placeholder="Pilih endpoint dari kiri..." />
-      <button class="send-btn" id="sendBtn" onclick="sendRequest()">▶ Send</button>
+  <div class="container">
+    <!-- SIDEBAR -->
+    <div class="sidebar" id="sidebar">
+      <!-- Diisi JS -->
     </div>
-    <div class="params-bar" id="paramsBar">
-      <span style="font-size:12px;color:#444;">← Pilih sumber & endpoint dari kiri</span>
-    </div>
-    <div class="response-area">
-      <div class="response-header" id="responseHeader">
-        <span style="font-size:12px;color:#555;">Response</span>
+
+    <!-- MAIN PANEL -->
+    <div class="main">
+      <div class="url-bar">
+        <span style="color:#22c55e;font-weight:700;font-size:13px;min-width:28px;">GET</span>
+        <input type="text" id="urlInput" placeholder="Pilih endpoint dari kiri..." />
+        <button class="send-btn" id="sendBtn" onclick="sendRequest()">▶ Send</button>
       </div>
-      <pre id="responseBox"><div class="placeholder"><p style="font-size:14px;">🎯 Pilih sumber di tab atas, lalu pilih endpoint</p></div></pre>
+      <div class="params-bar" id="paramsBar">
+        <span style="font-size:12px;color:#444;">← Pilih sumber & endpoint dari kiri</span>
+      </div>
+      <div class="response-area">
+        <div class="response-header" id="responseHeader">
+          <span style="font-size:12px;color:#555;">Response</span>
+        </div>
+        <pre
+          id="responseBox"><div class="placeholder"><p style="font-size:14px;">🎯 Pilih sumber di tab atas, lalu pilih endpoint</p></div></pre>
+      </div>
     </div>
   </div>
-</div>
 
-<script>
-const SOURCES = {
-  hianime: {
-    name: 'HiAnime',
-    accent: '#06b6d4',
-    base: window.location.origin,
-    status: 'ready',
-    desc: 'Scraper resmi HiAnime (Zoro.to). Menyediakan data anime, episode, dan stream URL.',
-    sections: [
-      { label: '🏠 General', endpoints: [
-        { name: 'Home Info', path: '/api', params: [] },
-        { name: 'Top 10', path: '/api/top-ten', params: [] },
-        { name: 'Random Anime', path: '/api/random', params: [] },
-        { name: 'Top Search', path: '/api/top-search', params: [] },
-      ]},
-      { label: '🔍 Search', endpoints: [
-        { name: 'Search', path: '/api/search', params: [{key:'q',label:'Keyword',val:'one piece'},{key:'page',label:'Page',val:'1'}] },
-        { name: 'Suggest', path: '/api/search/suggest', params: [{key:'q',label:'Keyword',val:'naruto'}] },
-      ]},
-      { label: '🎬 Anime Detail', endpoints: [
-        { name: 'Anime Info', path: '/api/info', params: [{key:'id',label:'Anime ID',val:'one-piece-100'}] },
-        { name: 'Episode List', path: '/api/episodes/{id}', params: [{key:'id',label:'Anime ID (path)',val:'one-piece-100'}] },
-        { name: 'Servers', path: '/api/servers/{id}', params: [{key:'id',label:'Episode ID (path)',val:'one-piece-100?ep=1818'}] },
-      ]},
-      { label: '🎞️ Streaming', endpoints: [
-        { name: 'Stream Info 🔥', path: '/api/stream', params: [{key:'id',label:'Episode ID',val:'one-piece-100?ep=1818'},{key:'server',label:'Server',val:'hd-1'},{key:'type',label:'Type',val:'sub'}] },
-        { name: 'Fallback Stream', path: '/api/stream/fallback', params: [{key:'id',label:'Episode ID',val:'one-piece-100?ep=1818'},{key:'server',label:'Server',val:'hd-2'},{key:'type',label:'Type',val:'sub'}] },
-      ]},
-      { label: '📂 Categories', endpoints: [
-        { name: 'Top Airing', path: '/api/top-airing', params: [{key:'page',label:'Page',val:'1'}] },
-        { name: 'Most Popular', path: '/api/most-popular', params: [{key:'page',label:'Page',val:'1'}] },
-        { name: 'Completed', path: '/api/completed', params: [{key:'page',label:'Page',val:'1'}] },
-        { name: 'Recently Updated', path: '/api/recently-updated', params: [{key:'page',label:'Page',val:'1'}] },
-      ]},
-    ]
-  },
+  <script>
+    const SOURCES = {
+      hianime: {
+        name: 'HiAnime',
+        accent: '#06b6d4',
+        base: window.location.origin,
+        status: 'ready',
+        desc: 'Scraper resmi HiAnime (Zoro.to). Menyediakan data anime, episode, dan stream URL.',
+        sections: [
+          {
+            label: '🏠 General', endpoints: [
+              { name: 'Home Info', path: '/api', params: [] },
+              { name: 'Top 10', path: '/api/top-ten', params: [] },
+              { name: 'Random Anime', path: '/api/random', params: [] },
+              { name: 'Top Search', path: '/api/top-search', params: [] },
+            ]
+          },
+          {
+            label: '🔍 Search', endpoints: [
+              { name: 'Search', path: '/api/search', params: [{ key: 'q', label: 'Keyword', val: 'one piece' }, { key: 'page', label: 'Page', val: '1' }] },
+              { name: 'Suggest', path: '/api/search/suggest', params: [{ key: 'q', label: 'Keyword', val: 'naruto' }] },
+            ]
+          },
+          {
+            label: '🎬 Anime Detail', endpoints: [
+              { name: 'Anime Info', path: '/api/info', params: [{ key: 'id', label: 'Anime ID', val: 'one-piece-100' }] },
+              { name: 'Episode List', path: '/api/episodes/{id}', params: [{ key: 'id', label: 'Anime ID (path)', val: 'one-piece-100' }] },
+              { name: 'Servers', path: '/api/servers/{id}', params: [{ key: 'id', label: 'Episode ID (path)', val: 'one-piece-100?ep=1818' }] },
+            ]
+          },
+          {
+            label: '🎞️ Streaming', endpoints: [
+              { name: 'Stream Info 🔥', path: '/api/stream', params: [{ key: 'id', label: 'Episode ID', val: 'one-piece-100?ep=1818' }, { key: 'server', label: 'Server', val: 'hd-1' }, { key: 'type', label: 'Type', val: 'sub' }] },
+              { name: 'Fallback Stream', path: '/api/stream/fallback', params: [{ key: 'id', label: 'Episode ID', val: 'one-piece-100?ep=1818' }, { key: 'server', label: 'Server', val: 'hd-2' }, { key: 'type', label: 'Type', val: 'sub' }] },
+            ]
+          },
+          {
+            label: '📂 Categories', endpoints: [
+              { name: 'Top Airing', path: '/api/top-airing', params: [{ key: 'page', label: 'Page', val: '1' }] },
+              { name: 'Most Popular', path: '/api/most-popular', params: [{ key: 'page', label: 'Page', val: '1' }] },
+              { name: 'Completed', path: '/api/completed', params: [{ key: 'page', label: 'Page', val: '1' }] },
+              { name: 'Recently Updated', path: '/api/recently-updated', params: [{ key: 'page', label: 'Page', val: '1' }] },
+            ]
+          },
+        ]
+      },
 
-  animelovers: {
-    name: 'AnimeLovers',
-    accent: '#a855f7',
-    base: window.location.origin,
-    status: 'ready',
-    desc: 'Sumber anime sub Indonesia via animekita.org. Mendukung pencarian, info episode, dan stream MP4.',
-    sections: [
-      { label: '🔍 Search', endpoints: [
-        { name: 'Cari Anime', path: '/api/animelovers/search', params: [{key:'q',label:'Keyword',val:'one piece'},{key:'page',label:'Page',val:'1'}] },
-      ]},
-      { label: '🎬 Episode & Info', endpoints: [
-        { name: 'Info + List Episode', path: '/api/animelovers/info', params: [{key:'id',label:'Anime ID (slug dari search)',val:'tomb-raider-king-sub-indo'}] },
-        { name: '📋 Episodes by Title (untuk NEETflix)', path: '/api/animelovers/episodes-by-title', params: [{key:'title',label:'Judul Anime',val:'One Piece'}] },
-      ]},
-      { label: '🎞️ Streaming 🔥', endpoints: [
-        { name: 'Get Stream URL', path: '/api/animelovers/stream', params: [{key:'id',label:'Episode ID (dari episodes[].id di /info)',val:'al-154213-1'}] },
-        { name: '⚡ Stream by Title (untuk NEETflix)', path: '/api/animelovers/stream-by-title', params: [{key:'title',label:'Judul Anime',val:'Tomb Raider King'},{key:'ep',label:'Nomor Episode',val:'1'}] },
-      ]},
-    ]
-  },
+      animelovers: {
+        name: 'AnimeLovers',
+        accent: '#a855f7',
+        base: window.location.origin,
+        status: 'ready',
+        desc: 'Sumber anime sub Indonesia via animekita.org. Mendukung pencarian, info episode, dan stream MP4.',
+        sections: [
+          {
+            label: '🔍 Search', endpoints: [
+              { name: 'Cari Anime', path: '/api/animelovers/search', params: [{ key: 'q', label: 'Keyword', val: 'one piece' }, { key: 'page', label: 'Page', val: '1' }] },
+            ]
+          },
+          {
+            label: '🎬 Episode & Info', endpoints: [
+              { name: 'Info + List Episode', path: '/api/animelovers/info', params: [{ key: 'id', label: 'Anime ID (slug dari search)', val: 'tomb-raider-king-sub-indo' }] },
+              { name: '📋 Episodes by Title (untuk NEETflix)', path: '/api/animelovers/episodes-by-title', params: [{ key: 'title', label: 'Judul Anime', val: 'One Piece' }] },
+            ]
+          },
+          {
+            label: '🎞️ Streaming 🔥', endpoints: [
+              { name: 'Get Stream URL', path: '/api/animelovers/stream', params: [{ key: 'id', label: 'Episode ID (dari episodes[].id di /info)', val: 'al-154213-1' }] },
+              { name: '⚡ Stream by Title (untuk NEETflix)', path: '/api/animelovers/stream-by-title', params: [{ key: 'title', label: 'Judul Anime', val: 'Tomb Raider King' }, { key: 'ep', label: 'Nomor Episode', val: '1' }] },
+            ]
+          },
+        ]
+      },
 
-  otakudesu: {
-    name: 'Otakudesu',
-    accent: '#f97316',
-    base: window.location.origin,
-    status: 'ready',
-    desc: 'Sumber anime sub Indonesia dari Otakudesu. Mendukung pencarian, episode, dan streaming MP4.',
-    sections: [
-      { label: '🎬 Episode & Info', endpoints: [
-        { name: '📋 Episodes by Title (untuk NEETflix)', path: '/api/otakudesu/episodes-by-title', params: [{key:'title',label:'Judul Anime',val:'One Piece'}] },
-      ]},
-      { label: '🎞️ Streaming 🔥', endpoints: [
-        { name: '⚡ Stream by Title (untuk NEETflix)', path: '/api/otakudesu/stream-by-title', params: [{key:'title',label:'Judul Anime',val:'One Piece'},{key:'ep',label:'Nomor Episode',val:'1168'}] },
-      ]},
-    ],
-    planned: false,
-  },
+      otakudesu: {
+        name: 'Otakudesu',
+        accent: '#f97316',
+        base: window.location.origin,
+        status: 'ready',
+        desc: 'Sumber anime sub Indonesia dari Otakudesu. Mendukung pencarian, episode, dan streaming MP4.',
+        sections: [
+          {
+            label: '🔍 Search', endpoints: [
+              { name: 'Cari Anime', path: '/api/otakudesu/search', params: [{ key: 'q', label: 'Keyword', val: 'one piece' }] },
+            ]
+          },
+          {
+            label: '🎬 Episode & Info', endpoints: [
+              { name: 'Info + List Episode', path: '/api/otakudesu/info', params: [{ key: 'id', label: 'Anime ID (slug dari search)', val: '1piece-sub-indo' }] },
+              { name: '📋 Episodes by Title (untuk NEETflix)', path: '/api/otakudesu/episodes-by-title', params: [{ key: 'title', label: 'Judul Anime', val: 'One Piece' }] },
+            ]
+          },
+          {
+            label: '🎞️ Streaming 🔥', endpoints: [
+              { name: '⚡ Stream by Title (untuk NEETflix)', path: '/api/otakudesu/stream-by-title', params: [{ key: 'title', label: 'Judul Anime', val: 'One Piece' }, { key: 'ep', label: 'Nomor Episode', val: '1' }] },
+            ]
+          },
+        ],
+        planned: false,
+      },
 
-  gogoanime: {
-    name: 'Gogoanime',
-    accent: '#22c55e',
-    base: window.location.origin,
-    status: 'planned',
-    desc: 'Sumber anime dari Gogoanime. Mendukung dub & sub. Belum diimplementasikan.',
-    sections: [],
-    planned: true,
-  },
+      gogoanime: {
+        name: 'Gogoanime',
+        accent: '#22c55e',
+        base: window.location.origin,
+        status: 'planned',
+        desc: 'Sumber anime dari Gogoanime. Mendukung dub & sub. Belum diimplementasikan.',
+        sections: [],
+        planned: true,
+      },
 
-  animasu: {
-    name: 'Animasu',
-    accent: '#ec4899',
-    base: window.location.origin,
-    status: 'planned',
-    desc: 'Sumber anime dari Animasu. Belum diimplementasikan.',
-    sections: [],
-    planned: true,
-  },
-};
+      animasu: {
+        name: 'Animasu',
+        accent: '#ec4899',
+        base: window.location.origin,
+        status: 'planned',
+        desc: 'Sumber anime dari Animasu. Belum diimplementasikan.',
+        sections: [],
+        planned: true,
+      },
+    };
 
-let currentSource = 'animelovers';
-let currentParams = [];
-let currentPathTemplate = '';
+    let currentSource = 'animelovers';
+    let currentParams = [];
+    let currentPathTemplate = '';
 
-function switchSource(key) {
-  currentSource = key;
-  document.querySelectorAll('.source-tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('tab-' + key)?.classList.add('active');
-  document.documentElement.style.setProperty('--accent', SOURCES[key].accent);
-  renderSidebar(key);
-  document.getElementById('urlInput').value = '';
-  document.getElementById('paramsBar').innerHTML = `<span style="font-size:12px;color:#444;">← Pilih endpoint dari kiri</span>`;
-  document.getElementById('responseBox').innerHTML = `<div class="placeholder"><p style="font-size:14px;">🎯 Pilih endpoint dari kiri</p></div>`;
-  document.getElementById('responseHeader').innerHTML = `<span style="font-size:12px;color:#555;">Response</span>`;
-}
+    function switchSource(key) {
+      currentSource = key;
+      document.querySelectorAll('.source-tab').forEach(t => t.classList.remove('active'));
+      document.getElementById('tab-' + key)?.classList.add('active');
+      document.documentElement.style.setProperty('--accent', SOURCES[key].accent);
+      renderSidebar(key);
+      document.getElementById('urlInput').value = '';
+      document.getElementById('paramsBar').innerHTML = `<span style="font-size:12px;color:#444;">← Pilih endpoint dari kiri</span>`;
+      document.getElementById('responseBox').innerHTML = `<div class="placeholder"><p style="font-size:14px;">🎯 Pilih endpoint dari kiri</p></div>`;
+      document.getElementById('responseHeader').innerHTML = `<span style="font-size:12px;color:#555;">Response</span>`;
+    }
 
-function renderSidebar(key) {
-  const src = SOURCES[key];
-  const sidebar = document.getElementById('sidebar');
-  const accent = src.accent;
-  document.documentElement.style.setProperty('--accent', accent);
+    function renderSidebar(key) {
+      const src = SOURCES[key];
+      const sidebar = document.getElementById('sidebar');
+      const accent = src.accent;
+      document.documentElement.style.setProperty('--accent', accent);
 
-  let html = `
+      let html = `
     <div class="source-info">
       <h3 style="color:${accent}">${src.name}</h3>
       <p>${src.desc}</p>
@@ -283,109 +637,110 @@ function renderSidebar(key) {
     </div>
   `;
 
-  if (src.wip) {
-    html += `<div class="wip-note">⚠️ <strong>Work In Progress</strong><br>Kirimkan endpoint AnimeLovers ke saya, nanti langsung saya buatkan!<br><br>Format: <code>GET /episode-sources?id=xxx</code></div>`;
-  } else if (src.planned) {
-    html += `<div class="planned-note">📋 <strong>Planned</strong><br>Sumber ini belum diimplementasikan. Akan ditambahkan setelah sumber utama selesai.</div>`;
-  } else {
-    src.sections.forEach((sec, si) => {
-      html += `<div class="sidebar-section"><div class="sidebar-label">${sec.label}</div>`;
-      sec.endpoints.forEach((ep, ei) => {
-        html += `<button class="endpoint-btn" data-src="${key}" data-si="${si}" data-ei="${ei}" onclick="handleEndpointClick(this)">
+      if (src.wip) {
+        html += `<div class="wip-note">⚠️ <strong>Work In Progress</strong><br>Kirimkan endpoint AnimeLovers ke saya, nanti langsung saya buatkan!<br><br>Format: <code>GET /episode-sources?id=xxx</code></div>`;
+      } else if (src.planned) {
+        html += `<div class="planned-note">📋 <strong>Planned</strong><br>Sumber ini belum diimplementasikan. Akan ditambahkan setelah sumber utama selesai.</div>`;
+      } else {
+        src.sections.forEach((sec, si) => {
+          html += `<div class="sidebar-section"><div class="sidebar-label">${sec.label}</div>`;
+          sec.endpoints.forEach((ep, ei) => {
+            html += `<button class="endpoint-btn" data-src="${key}" data-si="${si}" data-ei="${ei}" onclick="handleEndpointClick(this)">
           <span class="method">GET</span><span>${ep.name}</span>
         </button>`;
-      });
-      html += `</div>`;
-    });
-  }
+          });
+          html += `</div>`;
+        });
+      }
 
-  sidebar.innerHTML = html;
-}
+      sidebar.innerHTML = html;
+    }
 
-function handleEndpointClick(btn) {
-  const { src, si, ei } = btn.dataset;
-  const ep = SOURCES[src].sections[parseInt(si)].endpoints[parseInt(ei)];
-  setEndpoint(ep.path, ep.name, ep.params, btn);
-}
+    function handleEndpointClick(btn) {
+      const { src, si, ei } = btn.dataset;
+      const ep = SOURCES[src].sections[parseInt(si)].endpoints[parseInt(ei)];
+      setEndpoint(ep.path, ep.name, ep.params, btn);
+    }
 
-function setEndpoint(path, name, params, btn) {
-  currentPathTemplate = path;
-  currentParams = params;
-  document.querySelectorAll('.endpoint-btn').forEach(b => b.classList.remove('active'));
-  (btn || event?.currentTarget)?.classList.add('active');
+    function setEndpoint(path, name, params, btn) {
+      currentPathTemplate = path;
+      currentParams = params;
+      document.querySelectorAll('.endpoint-btn').forEach(b => b.classList.remove('active'));
+      (btn || event?.currentTarget)?.classList.add('active');
 
-  const bar = document.getElementById('paramsBar');
-  if (!params.length) {
-    bar.innerHTML = `<span style="font-size:12px;color:#555;">Tidak ada parameter — langsung klik ▶ Send</span>`;
-  } else {
-    bar.innerHTML = params.map(p => `
+      const bar = document.getElementById('paramsBar');
+      if (!params.length) {
+        bar.innerHTML = `<span style="font-size:12px;color:#555;">Tidak ada parameter — langsung klik ▶ Send</span>`;
+      } else {
+        bar.innerHTML = params.map(p => `
       <div class="param-group">
         <label>${p.label}:</label>
         <input class="param-input" id="param_${p.key}" value="${p.val}" oninput="updateUrl()" />
       </div>`).join('');
-  }
-  updateUrl();
-  document.getElementById('responseBox').innerHTML = `<div class="placeholder"><p style="font-size:14px;">Klik ▶ Send untuk: ${name}</p></div>`;
-  document.getElementById('responseHeader').innerHTML = `<span style="font-size:12px;color:#555;">Response</span>`;
-}
+      }
+      updateUrl();
+      document.getElementById('responseBox').innerHTML = `<div class="placeholder"><p style="font-size:14px;">Klik ▶ Send untuk: ${name}</p></div>`;
+      document.getElementById('responseHeader').innerHTML = `<span style="font-size:12px;color:#555;">Response</span>`;
+    }
 
-function updateUrl() {
-  const src = SOURCES[currentSource];
-  let path = currentPathTemplate;
-  const pathParam = currentParams.find(p => p.label.includes('path'));
-  if (pathParam) {
-    const val = document.getElementById(`param_${pathParam.key}`)?.value || '';
-    path = path.replace(`{${pathParam.key}}`, val);
-  }
-  const queryParams = currentParams.filter(p => !p.label.includes('path'));
-  if (queryParams.length) {
-    const qs = queryParams.map(p => {
-      const val = document.getElementById(`param_${p.key}`)?.value || '';
-      return val ? `${p.key}=${encodeURIComponent(val)}` : '';
-    }).filter(Boolean).join('&');
-    if (qs) path += '?' + qs;
-  }
-  document.getElementById('urlInput').value = src.base + path;
-}
+    function updateUrl() {
+      const src = SOURCES[currentSource];
+      let path = currentPathTemplate;
+      const pathParam = currentParams.find(p => p.label.includes('path'));
+      if (pathParam) {
+        const val = document.getElementById(`param_${pathParam.key}`)?.value || '';
+        path = path.replace(`{${pathParam.key}}`, val);
+      }
+      const queryParams = currentParams.filter(p => !p.label.includes('path'));
+      if (queryParams.length) {
+        const qs = queryParams.map(p => {
+          const val = document.getElementById(`param_${p.key}`)?.value || '';
+          return val ? `${p.key}=${encodeURIComponent(val)}` : '';
+        }).filter(Boolean).join('&');
+        if (qs) path += '?' + qs;
+      }
+      document.getElementById('urlInput').value = src.base + path;
+    }
 
-async function sendRequest() {
-  const url = document.getElementById('urlInput').value;
-  if (!url || url.trim() === '') return;
-  const btn = document.getElementById('sendBtn');
-  const resBox = document.getElementById('responseBox');
-  const resHeader = document.getElementById('responseHeader');
+    async function sendRequest() {
+      const url = document.getElementById('urlInput').value;
+      if (!url || url.trim() === '') return;
+      const btn = document.getElementById('sendBtn');
+      const resBox = document.getElementById('responseBox');
+      const resHeader = document.getElementById('responseHeader');
 
-  btn.textContent = '⏳'; btn.classList.add('loading');
-  resBox.textContent = 'Loading...';
-  const start = Date.now();
-  try {
-    const res = await fetch(url);
-    const time = Date.now() - start;
-    const data = await res.json();
-    const pretty = JSON.stringify(data, null, 2);
-    const statusClass = res.ok ? 'status-200' : 'status-err';
-    resHeader.innerHTML = `
+      btn.textContent = '⏳'; btn.classList.add('loading');
+      resBox.textContent = 'Loading...';
+      const start = Date.now();
+      try {
+        const res = await fetch(url);
+        const time = Date.now() - start;
+        const data = await res.json();
+        const pretty = JSON.stringify(data, null, 2);
+        const statusClass = res.ok ? 'status-200' : 'status-err';
+        resHeader.innerHTML = `
       <span style="font-size:12px;color:#555;">Response</span>
       <span class="status-badge ${statusClass}">${res.status} ${res.statusText}</span>
       <span class="time-badge">⚡ ${time}ms</span>
       <span style="font-size:11px;color:#444;margin-left:auto;">${pretty.length.toLocaleString()} chars</span>`;
-    resBox.innerHTML = pretty
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-      .replace(/"([^"]+)":/g,'<span style="color:#79c0ff">"$1"</span>:')
-      .replace(/: "([^"]*)"/g,': <span style="color:#a5d6ff">"$1"</span>')
-      .replace(/: (true|false)/g,': <span style="color:#ff7b72">$1</span>')
-      .replace(/: (\d+\.?\d*)/g,': <span style="color:#f2cc60">$1</span>');
-  } catch(err) {
-    resHeader.innerHTML = `<span style="font-size:12px;color:#555;">Response</span><span class="status-badge status-err">Error</span>`;
-    resBox.textContent = `❌ ${err.message}`;
-  }
-  btn.textContent = '▶ Send'; btn.classList.remove('loading');
-}
+        resBox.innerHTML = pretty
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"([^"]+)":/g, '<span style="color:#79c0ff">"$1"</span>:')
+          .replace(/: "([^"]*)"/g, ': <span style="color:#a5d6ff">"$1"</span>')
+          .replace(/: (true|false)/g, ': <span style="color:#ff7b72">$1</span>')
+          .replace(/: (\d+\.?\d*)/g, ': <span style="color:#f2cc60">$1</span>');
+      } catch (err) {
+        resHeader.innerHTML = `<span style="font-size:12px;color:#555;">Response</span><span class="status-badge status-err">Error</span>`;
+        resBox.textContent = `❌ ${err.message}`;
+      }
+      btn.textContent = '▶ Send'; btn.classList.remove('loading');
+    }
 
-document.getElementById('urlInput').addEventListener('keydown', e => { if(e.key==='Enter') sendRequest(); });
+    document.getElementById('urlInput').addEventListener('keydown', e => { if (e.key === 'Enter') sendRequest(); });
 
-// Init
-switchSource('animelovers');
-</script>
+    // Init
+    switchSource('animelovers');
+  </script>
 </body>
+
 </html>

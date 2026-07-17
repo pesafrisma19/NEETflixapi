@@ -6,6 +6,8 @@ import {
 } from "../sources/animelovers.js";
 import { getEpisodesByTitle, getEpisodeStreamByTitle } from "../sources/animelovers.js";
 import { 
+  searchOtakudesu,
+  getInfoOtakudesu,
   getEpisodesByTitle as getOdEpisodesByTitle, 
   getEpisodeStreamByTitle as getOdEpisodeStreamByTitle 
 } from "../sources/otakudesu.js";
@@ -169,6 +171,18 @@ export const createApiRoutes = (app, jsonResponse, jsonError) => {
   // ==========================================
   // OTAKUDESU ROUTES
   // ==========================================
+
+  createRoute("/api/otakudesu/search", async (req) => {
+    const { q } = req.query;
+    if (!q) throw new Error("Parameter 'q' (keyword) wajib diisi");
+    return await searchOtakudesu(q);
+  });
+
+  createRoute("/api/otakudesu/info", async (req) => {
+    const { id } = req.query;
+    if (!id) throw new Error("Parameter 'id' wajib diisi");
+    return await getInfoOtakudesu(id);
+  });
 
   // GET /api/otakudesu/stream-by-title (untuk testing Dashboard)
   createRoute("/api/otakudesu/stream-by-title", async (req) => {
