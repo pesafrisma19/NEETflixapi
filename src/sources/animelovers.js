@@ -145,11 +145,12 @@ function calculateMatchScore(anilistData, candidate) {
   if (qSeasons.length === 0 && cSeasons.length > 0) score -= 30; // candidate punya season tp query tidak
 
   // 2. YEAR MATCH (Max 20)
-  if (anilistData.year && candidate.releaseDate) {
+  const aYearData = anilistData.year || anilistData.seasonYear;
+  if (aYearData && candidate.releaseDate) {
     const cYearMatch = candidate.releaseDate.match(/\d{4}/);
     if (cYearMatch) {
       const cYear = parseInt(cYearMatch[0], 10);
-      const aYear = parseInt(anilistData.year, 10);
+      const aYear = parseInt(aYearData, 10);
       if (cYear === aYear) {
         score += 20;
       } else if (Math.abs(cYear - aYear) === 1) {
@@ -173,8 +174,8 @@ function calculateMatchScore(anilistData, candidate) {
 
   // 4. STUDIO MATCH (Max 10)
   if (anilistData.studio && candidate.studio) {
-    const aStudio = normalize(anilistData.studio);
-    const cStudio = normalize(candidate.studio);
+    const aStudio = normalize(anilistData.studio).replace(/\s/g, ''); // Hapus spasi agar 8-bit cocok dgn 8bit
+    const cStudio = normalize(candidate.studio).replace(/\s/g, '');
     if (aStudio && cStudio && (aStudio.includes(cStudio) || cStudio.includes(aStudio))) {
       score += 10;
     }
@@ -226,6 +227,11 @@ export async function getEpisodeStreamByTitle(anilistData, epNum) {
     const stripped = t.replace(/\s*\(\d{4}\)\s*/g, '').replace(/\s*\(TV\)\s*/gi, '').trim();
     if (stripped !== t && !searchQueries.includes(stripped)) {
       searchQueries.push(stripped);
+    }
+    // Fallback: 3 kata pertama agar search engine Animekita tidak memberikan hasil kosong
+    const shortQuery = stripped.split(' ').slice(0, 3).join(' ');
+    if (shortQuery.length > 5 && !searchQueries.includes(shortQuery)) {
+      searchQueries.push(shortQuery);
     }
   }
 
@@ -295,6 +301,11 @@ export async function getEpisodesByTitle(anilistData) {
     const stripped = t.replace(/\s*\(\d{4}\)\s*/g, '').replace(/\s*\(TV\)\s*/gi, '').trim();
     if (stripped !== t && !searchQueries.includes(stripped)) {
       searchQueries.push(stripped);
+    }
+    // Fallback: 3 kata pertama agar search engine Animekita tidak memberikan hasil kosong
+    const shortQuery = stripped.split(' ').slice(0, 3).join(' ');
+    if (shortQuery.length > 5 && !searchQueries.includes(shortQuery)) {
+      searchQueries.push(shortQuery);
     }
   }
 
