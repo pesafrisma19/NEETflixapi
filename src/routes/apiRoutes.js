@@ -135,7 +135,15 @@ export const createApiRoutes = (app, jsonResponse, jsonError) => {
     return await getStreamAnimelovers(id);
   });
 
-  // POST /api/animelovers/stream-by-title
+  // GET /api/animelovers/stream-by-title (untuk testing Dashboard)
+  createRoute("/api/animelovers/stream-by-title", async (req) => {
+    const { title, ep } = req.query;
+    if (!title) throw new Error("Parameter 'title' wajib diisi");
+    if (!ep) throw new Error("Parameter 'ep' (nomor episode) wajib diisi");
+    return await getEpisodeStreamByTitle(title, ep);
+  });
+
+  // POST /api/animelovers/stream-by-title (untuk NEETflix)
   createPostRoute("/api/animelovers/stream-by-title", async (req) => {
     const payload = req.body;
     const ep = payload.ep || req.query.ep;
@@ -144,7 +152,14 @@ export const createApiRoutes = (app, jsonResponse, jsonError) => {
     return await getEpisodeStreamByTitle(payload, ep);
   });
 
-  // POST /api/animelovers/episodes-by-title
+  // GET /api/animelovers/episodes-by-title (untuk testing Dashboard)
+  createRoute("/api/animelovers/episodes-by-title", async (req) => {
+    const { title } = req.query;
+    if (!title) throw new Error("Parameter 'title' wajib diisi");
+    return await getEpisodesByTitle(title);
+  });
+
+  // POST /api/animelovers/episodes-by-title (untuk NEETflix)
   createPostRoute("/api/animelovers/episodes-by-title", async (req) => {
     const payload = req.body;
     if (!payload) throw new Error("Payload (body) wajib diisi");
@@ -155,7 +170,15 @@ export const createApiRoutes = (app, jsonResponse, jsonError) => {
   // OTAKUDESU ROUTES
   // ==========================================
 
-  // POST /api/otakudesu/stream-by-title
+  // GET /api/otakudesu/stream-by-title (untuk testing Dashboard)
+  createRoute("/api/otakudesu/stream-by-title", async (req) => {
+    const { title, ep } = req.query;
+    if (!title) throw new Error("Parameter 'title' wajib diisi");
+    if (!ep) throw new Error("Parameter 'ep' (nomor episode) wajib diisi");
+    return await getOdEpisodeStreamByTitle(title, ep);
+  });
+
+  // POST /api/otakudesu/stream-by-title (untuk NEETflix)
   createPostRoute("/api/otakudesu/stream-by-title", async (req) => {
     const payload = req.body;
     const ep = payload.ep || req.query.ep;
@@ -164,7 +187,14 @@ export const createApiRoutes = (app, jsonResponse, jsonError) => {
     return await getOdEpisodeStreamByTitle(payload, ep);
   });
 
-  // POST /api/otakudesu/episodes-by-title
+  // GET /api/otakudesu/episodes-by-title (untuk testing Dashboard)
+  createRoute("/api/otakudesu/episodes-by-title", async (req) => {
+    const { title } = req.query;
+    if (!title) throw new Error("Parameter 'title' wajib diisi");
+    return await getOdEpisodesByTitle(title);
+  });
+
+  // POST /api/otakudesu/episodes-by-title (untuk NEETflix)
   createPostRoute("/api/otakudesu/episodes-by-title", async (req) => {
     const payload = req.body;
     if (!payload) throw new Error("Payload (body) wajib diisi");
