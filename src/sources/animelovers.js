@@ -44,7 +44,7 @@ export async function searchAnimelovers(query, page = 1) {
 }
 
 export async function getInfoAnimelovers(id) {
-  const url = `${BASE}/series.php?url=${id}`;
+  const url = `${BASE}/series.php?url=${encodeURIComponent(id)}`;
   const res = await fetch(url, { headers: HEADERS });
   if (!res.ok) throw new Error("Gagal memuat detail AnimeLovers");
   const json = parseSafeJson(await res.text());
@@ -71,7 +71,7 @@ export async function getInfoAnimelovers(id) {
 }
 
 export async function getStreamAnimelovers(id) {
-  const url = `${BASE}/series/episode/data.php?url=${id}`;
+  const url = `${BASE}/series/episode/data.php?url=${encodeURIComponent(id)}`;
   const res = await fetch(url, { headers: HEADERS });
   if (!res.ok) throw new Error("Gagal memuat stream AnimeLovers");
   const json = parseSafeJson(await res.text());
