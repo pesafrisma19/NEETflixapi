@@ -141,16 +141,16 @@ export const createApiRoutes = (app, jsonResponse, jsonError) => {
   createRoute("/api/animelovers/stream-by-title", async (req) => {
     const { title, ep } = req.query;
     if (!title) throw new Error("Parameter 'title' wajib diisi");
-    if (!ep) throw new Error("Parameter 'ep' (nomor episode) wajib diisi");
+    if (ep === undefined || ep === null || ep === "") throw new Error("Parameter 'ep' (nomor episode) wajib diisi");
     return await getEpisodeStreamByTitle(title, ep);
   });
 
   // POST /api/animelovers/stream-by-title (untuk NEETflix)
   createPostRoute("/api/animelovers/stream-by-title", async (req) => {
     const payload = req.body;
-    const ep = payload.ep || req.query.ep;
     if (!payload) throw new Error("Payload (body) wajib diisi");
-    if (!ep) throw new Error("Parameter 'ep' (nomor episode) wajib diisi");
+    const ep = payload.ep !== undefined ? payload.ep : req.query.ep;
+    if (ep === undefined || ep === null || ep === "") throw new Error("Parameter 'ep' (nomor episode) wajib diisi");
     return await getEpisodeStreamByTitle(payload, ep);
   });
 
@@ -188,16 +188,16 @@ export const createApiRoutes = (app, jsonResponse, jsonError) => {
   createRoute("/api/otakudesu/stream-by-title", async (req) => {
     const { title, ep } = req.query;
     if (!title) throw new Error("Parameter 'title' wajib diisi");
-    if (!ep) throw new Error("Parameter 'ep' (nomor episode) wajib diisi");
+    if (ep === undefined || ep === null || ep === "") throw new Error("Parameter 'ep' (nomor episode) wajib diisi");
     return await getOdEpisodeStreamByTitle(title, ep);
   });
 
   // POST /api/otakudesu/stream-by-title (untuk NEETflix)
   createPostRoute("/api/otakudesu/stream-by-title", async (req) => {
     const payload = req.body;
-    const ep = payload.ep || req.query.ep;
     if (!payload) throw new Error("Payload (body) wajib diisi");
-    if (!ep) throw new Error("Parameter 'ep' (nomor episode) wajib diisi");
+    const ep = payload.ep !== undefined ? payload.ep : req.query.ep;
+    if (ep === undefined || ep === null || ep === "") throw new Error("Parameter 'ep' (nomor episode) wajib diisi");
     return await getOdEpisodeStreamByTitle(payload, ep);
   });
 
