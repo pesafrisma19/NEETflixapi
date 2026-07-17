@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import https from 'https';
+import { getMapping } from '../utils/mappings.js';
 
 const agent = new https.Agent({ 
   rejectUnauthorized: false 
@@ -203,73 +204,236 @@ export async function getStreamOtakudesu(episodeId) {
 }
 
 // ==========================================
-// Integrasi untuk NEETflix API (Mirip dengan animelovers.js)
+// Integrasi untuk NEETflix API
 // ==========================================
 
-export async function getEpisodesByTitle(title) {
-  const results = await searchOtakudesu(title);
-  if (!results.length) throw new Error(`Anime "${title}" tidak ditemukan di Otakudesu`);
+/**
+ * Hitung skor kemiripan AniList ↔ Otakudesu candidate
+ * Sama dengan calculateMatchScore di animelovers.js
+ */
+function calculateMatchScore(anilistData, candidate) {
+  let score = 0;
+  const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9\s]/gi, ' ').replace(/\s+/g, ' ').trim();
+  const cTitle = normalize(candidate.title);
 
-  // Ambil hasil pencarian pertama saja, tanpa logika penggabungan / skor yang rumit
-  const bestCandidate = results[0];
-  
-  const info = await getInfoOtakudesu(bestCandidate.id);
-  if (!info.episodes || info.episodes.length === 0) {
-    throw new Error(`Episode list tidak ditemukan untuk "${title}" di Otakudesu`);
+  // 1. TITLE MATCH (Max 40) — Jaccard similarity
+  let bestTitleScore = 0;
+  for (const t of anilistData.titles || []) {
+    if (!t) continue;
+    const qTitle = normalize(t);
+    if (qTitle === cTitle) { bestTitleScore = 40; break; }
+    const qWords = new Set(qTitle.split(' ').filter(w => w.length > 2));
+    const cWords = cTitle.split(' ').filter(w => w.length > 2);
+    if (qWords.size === 0 && cWords.length === 0) continue;
+    const cSet = new Set(cWords);
+    const overlap = cWords.filter(w => qWords.has(w)).length;
+    const union = new Set([...qWords, ...cSet]).size;
+    const s = Math.round((overlap / Math.max(union, 1)) * 30);
+    if (s > bestTitleScore) bestTitleScore = s;
+  }
+  score += bestTitleScore;
+
+  // Season mismatch — bandingkan NOMOR season
+  const extractSeasonNum = (text) => {
+    if (!text) return null;
+    const t = text.toLowerCase();
+    let m = t.match(/(?:season\s*)(\d+)/);
+    if (m) return parseInt(m[1]);
+    m = t.match(/(\d+)(?:st|nd|rd|th)\s*season/);
+    if (m) return parseInt(m[1]);
+    m = t.match(/part\s*(\d+)/);
+    if (m) return parseInt(m[1]);
+    if (/\biv\b/.test(t)) return 4;
+    if (/\biii\b/.test(t)) return 3;
+    if (/\bii\b/.test(t)) return 2;
+    return null;
+  };
+  let qSeasonNum = null;
+  for (const t of anilistData.titles || []) {
+    const n = extractSeasonNum(t);
+    if (n !== null) { qSeasonNum = n; break; }
+  }
+  const cSeasonNum = extractSeasonNum(candidate.title);
+  if (qSeasonNum !== null && cSeasonNum !== null) {
+    if (qSeasonNum !== cSeasonNum) score -= 40;
+  } else if (qSeasonNum !== null && cSeasonNum === null) {
+    score -= 20;
+  } else if (qSeasonNum === null && cSeasonNum !== null) {
+    score -= 30;
   }
 
-  // Urutkan berdasarkan episode dari terkecil ke terbesar
-  const uniqueEpisodes = info.episodes
-    .map(ep => ({ number: ep.episodeNumber, id: ep.id }))
-    .sort((a, b) => Number(a.number) - Number(b.number));
+  // 2. YEAR MATCH (Max 20)
+  const aYearData = anilistData.year || anilistData.seasonYear;
+  if (aYearData && candidate.releaseYear) {
+    const cYear = parseInt(candidate.releaseYear);
+    const aYear = parseInt(aYearData);
+    if (cYear === aYear) score += 20;
+    else if (Math.abs(cYear - aYear) === 1) score += 10;
+    else score -= 20;
+  }
 
-  return {
-    animeId: bestCandidate.id,
-    animeTitle: info.title,
-    totalEpisodes: uniqueEpisodes.length,
-    episodes: uniqueEpisodes
-  };
+  // 3. FORMAT MATCH (Max 15)
+  if (anilistData.format && candidate.type) {
+    const aFormat = anilistData.format.toLowerCase();
+    const cFormat = candidate.type.toLowerCase();
+    if ((aFormat === 'tv' && cFormat === 'tv') || (aFormat === 'movie' && cFormat === 'movie')) {
+      score += 15;
+    } else if (aFormat !== cFormat && ['tv', 'movie'].includes(aFormat) && ['tv', 'movie'].includes(cFormat)) {
+      score -= 30;
+    }
+  }
+
+  return Math.min(score, 100);
 }
 
-export async function getEpisodeStreamByTitle(title, epNum) {
-  const results = await searchOtakudesu(title);
-  if (!results.length) throw new Error(`Anime "${title}" tidak ditemukan di Otakudesu`);
+/** Bersihkan special chars untuk search engine Otakudesu */
+const cleanForSearch = (s) => s.replace(/[^a-z0-9\s]/gi, ' ').replace(/\s+/g, ' ').trim();
 
-  const scored = results.slice(0, 8).map(r => ({
+/** Build daftar query yang akan dicoba secara berurutan */
+function buildSearchQueries(anilistData) {
+  const titlesToSearch = (typeof anilistData === 'object' && anilistData.titles)
+    ? anilistData.titles.slice(0, 3)
+    : [anilistData];
+  const queries = [];
+  for (const t of titlesToSearch) {
+    if (!t) continue;
+    queries.push(t);
+    const stripped = t.replace(/\s*\(\d{4}\)\s*/g, '').replace(/\s*\(TV\)\s*/gi, '').trim();
+    if (stripped !== t && !queries.includes(stripped)) queries.push(stripped);
+    const cleaned = cleanForSearch(stripped);
+    if (cleaned !== stripped && !queries.includes(cleaned)) queries.push(cleaned);
+    const shortQuery = cleaned.split(' ').filter(w => w.length > 1).slice(0, 3).join(' ');
+    if (shortQuery.length > 5 && !queries.includes(shortQuery)) queries.push(shortQuery);
+  }
+  return queries;
+}
+
+export async function getEpisodesByTitle(anilistData) {
+  const anilistId = typeof anilistData === 'object' ? anilistData.id : null;
+
+  // Cek mapping manual dulu
+  if (anilistId) {
+    const mappedSlug = getMapping(anilistId, 'otakudesu');
+    if (mappedSlug) {
+      const info = await getInfoOtakudesu(mappedSlug);
+      if (info.episodes && info.episodes.length > 0) {
+        return {
+          animeId: mappedSlug,
+          animeTitle: info.title,
+          totalEpisodes: info.episodes.length,
+          episodes: info.episodes.map(ep => ({
+            number: ep.episodeNumber,
+            id: ep.id
+          })).sort((a, b) => Number(a.number) - Number(b.number))
+        };
+      }
+    }
+  }
+
+  const searchQueries = buildSearchQueries(anilistData);
+  let results = [];
+  let query = '';
+  for (const q of searchQueries) {
+    if (!q) continue;
+    query = q;
+    results = await searchOtakudesu(q);
+    if (results.length > 0) break;
+  }
+  if (!results.length) throw new Error(`Anime "${searchQueries[0]}" tidak ditemukan di Otakudesu`);
+
+  const scored = results.map(r => ({
     ...r,
-    score: titleSimilarity(title, r.title || r.id || '')
+    score: (typeof anilistData === 'object') ? calculateMatchScore(anilistData, r) : 50
   })).sort((a, b) => b.score - a.score);
 
-  console.log(`[OD:stream] Candidates for "${title}":`, scored.map(s => `${s.id}(${s.score})`).join(', '));
+  console.log(`[OD:episodes] Candidates for "${query}":`, scored.map(s => `${s.id}(${s.score})`).join(', '));
 
-  let lastError = null;
+  const topScore = scored[0]?.score ?? 0;
+  if (topScore < 20) throw new Error(`Tidak ada hasil cocok untuk "${query}" di Otakudesu (skor terbaik: ${topScore})`);
+  const minAcceptable = topScore >= 70 ? 70 : 40;
+  const candidates = scored.filter(s => s.score >= minAcceptable);
+  if (candidates.length === 0) candidates.push(scored[0]);
 
-  for (const candidate of scored) {
-    if (candidate.score < 0.5) continue;
+  for (const candidate of candidates.slice(0, 3)) {
     try {
       const info = await getInfoOtakudesu(candidate.id);
       if (!info.episodes || info.episodes.length === 0) continue;
+      return {
+        animeId: candidate.id,
+        animeTitle: info.title,
+        totalEpisodes: info.episodes.length,
+        episodes: info.episodes.map(ep => ({
+          number: ep.episodeNumber,
+          id: ep.id
+        })).sort((a, b) => Number(a.number) - Number(b.number))
+      };
+    } catch (err) {
+      console.warn(`[OD:episodes] Error for "${candidate.id}":`, err.message);
+    }
+  }
+  throw new Error(`Episode list tidak ditemukan untuk "${query}" di Otakudesu`);
+}
 
-      const targetEp = info.episodes.find(ep => String(ep.episodeNumber) === String(epNum));
+export async function getEpisodeStreamByTitle(anilistData, epNum) {
+  const anilistId = typeof anilistData === 'object' ? anilistData.id : null;
+
+  // Cek mapping manual dulu
+  if (anilistId) {
+    const mappedSlug = getMapping(anilistId, 'otakudesu');
+    if (mappedSlug) {
+      const info = await getInfoOtakudesu(mappedSlug);
+      if (info.episodes && info.episodes.length > 0) {
+        const targetEp = info.episodes.find(ep => String(ep.episodeNumber) === String(epNum));
+        if (targetEp) {
+          const stream = await getStreamOtakudesu(targetEp.id);
+          return { animeId: mappedSlug, animeTitle: info.title, episodeId: targetEp.id, sources: stream.sources };
+        }
+      }
+    }
+  }
+
+  const searchQueries = buildSearchQueries(anilistData);
+  let results = [];
+  let query = '';
+  for (const q of searchQueries) {
+    if (!q) continue;
+    query = q;
+    results = await searchOtakudesu(q);
+    if (results.length > 0) break;
+  }
+  if (!results.length) throw new Error(`Anime "${searchQueries[0]}" tidak ditemukan di Otakudesu`);
+
+  const scored = results.map(r => ({
+    ...r,
+    score: (typeof anilistData === 'object') ? calculateMatchScore(anilistData, r) : 50
+  })).sort((a, b) => b.score - a.score);
+
+  console.log(`[OD:stream] Candidates for "${query}":`, scored.map(s => `${s.id}(${s.score})`).join(', '));
+
+  const topScore = scored[0]?.score ?? 0;
+  if (topScore < 20) throw new Error(`Tidak ada hasil cocok untuk "${query}" di Otakudesu (skor terbaik: ${topScore})`);
+  const minAcceptable = topScore >= 70 ? 70 : 40;
+  const candidates = scored.filter(s => s.score >= minAcceptable);
+  if (candidates.length === 0) candidates.push(scored[0]);
+
+  let lastError = null;
+  for (const candidate of candidates.slice(0, 3)) {
+    try {
+      const info = await getInfoOtakudesu(candidate.id);
+      if (!info.episodes || info.episodes.length === 0) continue;
+      const targetEp = info.episodes.find(ep => String(ep.episodeNumber) === String(epNum))
+        ?? (String(epNum) === '1' && info.episodes.length === 1 ? info.episodes[0] : null)
+        ?? (String(epNum) === '1' ? info.episodes.find(ep => /^(movie|ova|special|film)/i.test(String(ep.episodeNumber))) : null);
       if (!targetEp) {
         lastError = `Episode ${epNum} tidak ada di "${candidate.id}"`;
         continue;
       }
-
       console.log(`[OD:stream] ✅ Found at "${candidate.id}" episode ${epNum}`);
-
       const stream = await getStreamOtakudesu(targetEp.id);
-      return {
-        animeId: candidate.id,
-        animeTitle: info.title,
-        episodeId: targetEp.id,
-        sources: stream.sources
-      };
+      return { animeId: candidate.id, animeTitle: info.title, episodeId: targetEp.id, sources: stream.sources };
     } catch (err) {
       lastError = err.message;
-      continue;
     }
   }
-
-  throw new Error(lastError || `Episode ${epNum} tidak ditemukan untuk "${title}" di semua kandidat Otakudesu`);
+  throw new Error(lastError || `Episode ${epNum} tidak ditemukan untuk "${query}" di Otakudesu`);
 }

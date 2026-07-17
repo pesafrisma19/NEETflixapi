@@ -155,16 +155,19 @@ export const createApiRoutes = (app, jsonResponse, jsonError) => {
   // OTAKUDESU ROUTES
   // ==========================================
 
-  createRoute("/api/otakudesu/stream-by-title", async (req) => {
-    const { title, ep } = req.query;
-    if (!title) throw new Error("Parameter 'title' wajib diisi");
+  // POST /api/otakudesu/stream-by-title
+  createPostRoute("/api/otakudesu/stream-by-title", async (req) => {
+    const payload = req.body;
+    const ep = payload.ep || req.query.ep;
+    if (!payload) throw new Error("Payload (body) wajib diisi");
     if (!ep) throw new Error("Parameter 'ep' (nomor episode) wajib diisi");
-    return await getOdEpisodeStreamByTitle(title, ep);
+    return await getOdEpisodeStreamByTitle(payload, ep);
   });
 
-  createRoute("/api/otakudesu/episodes-by-title", async (req) => {
-    const { title } = req.query;
-    if (!title) throw new Error("Parameter 'title' wajib diisi");
-    return await getOdEpisodesByTitle(title);
+  // POST /api/otakudesu/episodes-by-title
+  createPostRoute("/api/otakudesu/episodes-by-title", async (req) => {
+    const payload = req.body;
+    if (!payload) throw new Error("Payload (body) wajib diisi");
+    return await getOdEpisodesByTitle(payload);
   });
 };
