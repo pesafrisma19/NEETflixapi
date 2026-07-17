@@ -131,18 +131,43 @@ function calculateMatchScore(anilistData, candidate) {
     const qWords = new Set(qTitle.split(' ').filter(w => w.length > 2));
     const cWords = cTitle.split(' ').filter(w => w.length > 2);
     if (qWords.size === 0 && cWords.length === 0) continue;
+    const cSet = new Set(cWords);
     const overlap = cWords.filter(w => qWords.has(w)).length;
-    const s = Math.round((overlap / Math.max(qWords.size, 1)) * 30);
+    const union = new Set([...qWords, ...cSet]).size;
+    const s = Math.round((overlap / Math.max(union, 1)) * 30); // Jaccard similarity
     if (s > bestTitleScore) bestTitleScore = s;
   }
   score += bestTitleScore;
 
-  // Deteksi season missmatch (sangat fatal)
-  const seasonPattern = /\b(s\d+|season\s*\d+|part\s*\d+|[ivx]{2,}|\d+(st|nd|rd|th)\s*(season|part)|ii|iii|iv)\b/gi;
-  const qSeasons = ((anilistData.titles || []).join(' ').match(seasonPattern) || []).map(s => s.toLowerCase());
-  const cSeasons = (candidate.title?.match(seasonPattern) || []).map(s => s.toLowerCase());
-  if (qSeasons.length > 0 && cSeasons.length === 0) score -= 20;
-  if (qSeasons.length === 0 && cSeasons.length > 0) score -= 30; // candidate punya season tp query tidak
+  // Deteksi season mismatch (sangat fatal) — bandingkan NOMOR season, bukan cuma ada/tidak
+  const extractSeasonNum = (text) => {
+    if (!text) return null;
+    const t = text.toLowerCase();
+    let m = t.match(/(?:s|season\s*)(\d+)/);
+    if (m) return parseInt(m[1]);
+    m = t.match(/(\d+)(?:st|nd|rd|th)\s*season/);
+    if (m) return parseInt(m[1]);
+    m = t.match(/part\s*(\d+)/);
+    if (m) return parseInt(m[1]);
+    // Roman numerals (hanya yang jelas)
+    if (/\biv\b/.test(t)) return 4;
+    if (/\biii\b/.test(t)) return 3;
+    if (/\bii\b/.test(t)) return 2;
+    return null;
+  };
+  let qSeasonNum = null;
+  for (const t of anilistData.titles || []) {
+    const n = extractSeasonNum(t);
+    if (n !== null) { qSeasonNum = n; break; }
+  }
+  const cSeasonNum = extractSeasonNum(candidate.title);
+  if (qSeasonNum !== null && cSeasonNum !== null) {
+    if (qSeasonNum !== cSeasonNum) score -= 40; // Beda nomor season = hampir pasti salah
+  } else if (qSeasonNum !== null && cSeasonNum === null) {
+    score -= 20; // AniList punya season tapi candidate tidak
+  } else if (qSeasonNum === null && cSeasonNum !== null) {
+    score -= 30; // Candidate punya season tapi AniList tidak
+  }
 
   // 2. YEAR MATCH (Max 20)
   const aYearData = anilistData.year || anilistData.seasonYear;
@@ -190,12 +215,18 @@ function calculateMatchScore(anilistData, candidate) {
 
   // 6. TOTAL EPISODES (Max 10)
   if (anilistData.totalEpisodes && candidate.total_episode) {
-    if (parseInt(anilistData.totalEpisodes) === parseInt(candidate.total_episode)) {
+    const aEps = parseInt(anilistData.totalEpisodes);
+    const cEps = parseInt(candidate.total_episode);
+    if (aEps === cEps) {
       score += 10;
+    } else if (Math.abs(aEps - cEps) <= 2) {
+      score += 5; // Sedikit beda bisa karena special/recap
+    } else {
+      score -= 15; // Beda jauh = kemungkinan besar beda series/season
     }
   }
 
-  return Math.min(Math.max(score, 0), 100);
+  return Math.min(score, 100); // Biarkan negatif untuk ranking yang lebih informatif
 }
 
 export async function getEpisodeStreamByTitle(anilistData, epNum) {
@@ -219,20 +250,24 @@ export async function getEpisodeStreamByTitle(anilistData, epNum) {
   let query = "";
   const titlesToSearch = (typeof anilistData === 'object' && anilistData.titles) ? anilistData.titles.slice(0, 3) : [anilistData];
   
+  // Helper: bersihkan special chars agar search engine AnimeLovers tidak bingung
+  // Contoh: "THE LAST -NARUTO THE MOVIE-" → "THE LAST NARUTO THE MOVIE"
+  const cleanForSearch = (s) => s.replace(/[^a-z0-9\s]/gi, ' ').replace(/\s+/g, ' ').trim();
+
   let searchQueries = [];
   for (const t of titlesToSearch) {
     if (!t) continue;
+    // Versi original
     searchQueries.push(t);
-    // Tambahkan variasi tanpa (YYYY) atau (TV)
+    // Versi tanpa (YYYY) atau (TV)
     const stripped = t.replace(/\s*\(\d{4}\)\s*/g, '').replace(/\s*\(TV\)\s*/gi, '').trim();
-    if (stripped !== t && !searchQueries.includes(stripped)) {
-      searchQueries.push(stripped);
-    }
-    // Fallback: 3 kata pertama agar search engine Animekita tidak memberikan hasil kosong
-    const shortQuery = stripped.split(' ').slice(0, 3).join(' ');
-    if (shortQuery.length > 5 && !searchQueries.includes(shortQuery)) {
-      searchQueries.push(shortQuery);
-    }
+    if (stripped !== t && !searchQueries.includes(stripped)) searchQueries.push(stripped);
+    // Versi bersih dari special chars (paling penting untuk judul romaji)
+    const cleaned = cleanForSearch(stripped);
+    if (cleaned !== stripped && !searchQueries.includes(cleaned)) searchQueries.push(cleaned);
+    // Fallback: 3 kata pertama dari versi bersih
+    const shortQuery = cleaned.split(' ').filter(w => w.length > 1).slice(0, 3).join(' ');
+    if (shortQuery.length > 5 && !searchQueries.includes(shortQuery)) searchQueries.push(shortQuery);
   }
 
   for (const t of searchQueries) {
@@ -251,7 +286,9 @@ export async function getEpisodeStreamByTitle(anilistData, epNum) {
 
   console.log(`[AL] Candidates for "${query}":`, scored.map(s => `${s.id}(${s.score})`).join(', '));
   
-  const minAcceptable = scored[0]?.score >= 70 ? 70 : 40;
+  const topScore = scored[0]?.score ?? 0;
+  if (topScore < 20) throw new Error(`Tidak ada hasil yang cocok untuk "${query}" di AnimeLovers (skor terbaik: ${topScore})`);
+  const minAcceptable = topScore >= 70 ? 70 : 40;
   const candidates = scored.filter(s => s.score >= minAcceptable);
   if (candidates.length === 0) candidates.push(scored[0]);
 
@@ -260,7 +297,10 @@ export async function getEpisodeStreamByTitle(anilistData, epNum) {
     try {
       const info = await getInfoAnimelovers(candidate.id);
       if (!info.episodes || info.episodes.length === 0) continue;
-      const targetEp = info.episodes.find(ep => String(ep.episodeNumber) === String(epNum));
+      // Cari episode by nomor, atau fallback ke episode non-numerik (Movie/OVA/Special) jika epNum=1
+      const targetEp = info.episodes.find(ep => String(ep.episodeNumber) === String(epNum))
+        ?? (String(epNum) === '1' && info.episodes.length === 1 ? info.episodes[0] : null)
+        ?? (String(epNum) === '1' ? info.episodes.find(ep => /^(movie|ova|special|film)/i.test(String(ep.episodeNumber))) : null);
       if (!targetEp) {
         lastError = `Episode ${epNum} tidak ada di "${candidate.id}"`;
         continue;
@@ -285,7 +325,11 @@ export async function getEpisodesByTitle(anilistData) {
         animeId: mappedSlug,
         animeTitle: info.title,
         totalEpisodes: info.episodes.length,
-        episodes: info.episodes.map(ep => ({ number: Number(ep.episodeNumber), id: ep.id })).sort((a, b) => a.number - b.number)
+        episodes: info.episodes.map(ep => {
+          const raw = ep.episodeNumber;
+          const num = parseFloat(raw);
+          return { number: isNaN(num) ? 1 : num, id: ep.id, label: isNaN(num) ? String(raw) : undefined };
+        }).sort((a, b) => a.number - b.number)
       };
     }
   }
@@ -294,19 +338,21 @@ export async function getEpisodesByTitle(anilistData) {
   let query = "";
   const titlesToSearch = (typeof anilistData === 'object' && anilistData.titles) ? anilistData.titles.slice(0, 3) : [anilistData];
   
+  // Helper: bersihkan special chars agar search engine AnimeLovers tidak bingung
+  const cleanForSearch = (s) => s.replace(/[^a-z0-9\s]/gi, ' ').replace(/\s+/g, ' ').trim();
+
   let searchQueries = [];
   for (const t of titlesToSearch) {
     if (!t) continue;
     searchQueries.push(t);
     const stripped = t.replace(/\s*\(\d{4}\)\s*/g, '').replace(/\s*\(TV\)\s*/gi, '').trim();
-    if (stripped !== t && !searchQueries.includes(stripped)) {
-      searchQueries.push(stripped);
-    }
-    // Fallback: 3 kata pertama agar search engine Animekita tidak memberikan hasil kosong
-    const shortQuery = stripped.split(' ').slice(0, 3).join(' ');
-    if (shortQuery.length > 5 && !searchQueries.includes(shortQuery)) {
-      searchQueries.push(shortQuery);
-    }
+    if (stripped !== t && !searchQueries.includes(stripped)) searchQueries.push(stripped);
+    // Versi bersih dari special chars (paling penting untuk judul romaji)
+    const cleaned = cleanForSearch(stripped);
+    if (cleaned !== stripped && !searchQueries.includes(cleaned)) searchQueries.push(cleaned);
+    // Fallback: 3 kata pertama dari versi bersih
+    const shortQuery = cleaned.split(' ').filter(w => w.length > 1).slice(0, 3).join(' ');
+    if (shortQuery.length > 5 && !searchQueries.includes(shortQuery)) searchQueries.push(shortQuery);
   }
 
   for (const t of searchQueries) {
@@ -325,7 +371,9 @@ export async function getEpisodesByTitle(anilistData) {
 
   console.log(`[AL:episodes] Candidates for "${query}":`, scored.map(s => `${s.id}(${s.score})`).join(', '));
   
-  const minAcceptable = scored[0]?.score >= 70 ? 70 : 40;
+  const topScore = scored[0]?.score ?? 0;
+  if (topScore < 20) throw new Error(`Tidak ada hasil yang cocok untuk "${query}" di AnimeLovers (skor terbaik: ${topScore})`);
+  const minAcceptable = topScore >= 70 ? 70 : 40;
   const candidates = scored.filter(s => s.score >= minAcceptable);
   if (candidates.length === 0) candidates.push(scored[0]);
 
@@ -337,7 +385,12 @@ export async function getEpisodesByTitle(anilistData) {
         animeId: candidate.id,
         animeTitle: info.title,
         totalEpisodes: info.episodes.length,
-        episodes: info.episodes.map(ep => ({ number: Number(ep.episodeNumber), id: ep.id })).sort((a, b) => a.number - b.number)
+        // Normalisasi episodeNumber: Movie/OVA/Special → 1, sisanya pakai Number()
+        episodes: info.episodes.map(ep => {
+          const raw = ep.episodeNumber;
+          const num = parseFloat(raw);
+          return { number: isNaN(num) ? 1 : num, id: ep.id, label: isNaN(num) ? String(raw) : undefined };
+        }).sort((a, b) => a.number - b.number)
       };
     } catch (err) {
       console.warn(`[AL:episodes] Error for "${candidate.id}":`, err.message);
