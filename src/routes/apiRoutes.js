@@ -1,4 +1,14 @@
 import * as homeInfoController from "../controllers/homeInfo.controller.js";
+import {
+  searchAnimelovers,
+  getInfoAnimelovers,
+  getStreamAnimelovers,
+} from "../sources/animelovers.js";
+import { getEpisodesByTitle, getEpisodeStreamByTitle } from "../sources/animelovers.js";
+import { 
+  getEpisodesByTitle as getOdEpisodesByTitle, 
+  getEpisodeStreamByTitle as getOdEpisodeStreamByTitle 
+} from "../sources/otakudesu.js";
 import * as categoryController from "../controllers/category.controller.js";
 import * as topTenController from "../controllers/topten.controller.js";
 import * as animeInfoController from "../controllers/animeInfo.controller.js";
@@ -30,6 +40,28 @@ export const createApiRoutes = (app, jsonResponse, jsonError) => {
           return jsonResponse(res, data);
         }
       } catch (err) {
+        if (err.status === 404 || err.message.includes("not found") || err.message.includes("tidak ditemukan")) {
+          return res.status(404).json({ message: err.message });
+        }
+        console.error(`Error in route ${path}:`, err);
+        if (!res.headersSent) {
+          return jsonError(res, err.message || "Internal server error");
+        }
+      }
+    });
+  };
+
+  const createPostRoute = (path, controllerMethod) => {
+    app.post(path, async (req, res) => {
+      try {
+        const data = await controllerMethod(req, res);
+        if (!res.headersSent) {
+          return jsonResponse(res, data);
+        }
+      } catch (err) {
+        if (err.status === 404 || err.message.includes("not found") || err.message.includes("tidak ditemukan")) {
+          return res.status(404).json({ message: err.message });
+        }
         console.error(`Error in route ${path}:`, err);
         if (!res.headersSent) {
           return jsonError(res, err.message || "Internal server error");
@@ -86,4 +118,53 @@ export const createApiRoutes = (app, jsonResponse, jsonError) => {
   createRoute("/api/actors/:id", getVoiceActors);
   createRoute("/api/character/:id", getCharacter);
   createRoute("/api/top-search", getTopSearch);
+
+  // ── AnimeLovers Source ──
+  createRoute("/api/animelovers/search", async (req) => {
+    const { q = "", page = 1 } = req.query;
+    return await searchAnimelovers(q, page);
+  });
+  createRoute("/api/animelovers/info", async (req) => {
+    const { id } = req.query;
+    if (!id) throw new Error("Parameter 'id' wajib diisi");
+    return await getInfoAnimelovers(id);
+  });
+  createRoute("/api/animelovers/stream", async (req) => {
+    const { id } = req.query;
+    if (!id) throw new Error("Parameter 'id' wajib diisi");
+    return await getStreamAnimelovers(id);
+  });
+
+  // POST /api/animelovers/stream-by-title
+  createPostRoute("/api/animelovers/stream-by-title", async (req) => {
+    const payload = req.body;
+    const ep = payload.ep || req.query.ep;
+    if (!payload) throw new Error("Payload (body) wajib diisi");
+    if (!ep) throw new Error("Parameter 'ep' (nomor episode) wajib diisi");
+    return await getEpisodeStreamByTitle(payload, ep);
+  });
+
+  // POST /api/animelovers/episodes-by-title
+  createPostRoute("/api/animelovers/episodes-by-title", async (req) => {
+    const payload = req.body;
+    if (!payload) throw new Error("Payload (body) wajib diisi");
+    return await getEpisodesByTitle(payload);
+  });
+
+  // ==========================================
+  // OTAKUDESU ROUTES
+  // ==========================================
+
+  createRoute("/api/otakudesu/stream-by-title", async (req) => {
+    const { title, ep } = req.query;
+    if (!title) throw new Error("Parameter 'title' wajib diisi");
+    if (!ep) throw new Error("Parameter 'ep' (nomor episode) wajib diisi");
+    return await getOdEpisodeStreamByTitle(title, ep);
+  });
+
+  createRoute("/api/otakudesu/episodes-by-title", async (req) => {
+    const { title } = req.query;
+    if (!title) throw new Error("Parameter 'title' wajib diisi");
+    return await getOdEpisodesByTitle(title);
+  });
 };

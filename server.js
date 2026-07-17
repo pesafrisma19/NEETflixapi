@@ -18,29 +18,34 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",");
 app.use(
   cors({
     origin: allowedOrigins?.includes("*") ? "*" : allowedOrigins || [],
-    methods: ["GET"],
+    methods: ["GET", "POST", "OPTIONS"],
   })
 );
 
-// Custom CORS middleware
+// Custom CORS middleware - only block requests WITH an origin that's not in the whitelist
 app.use((req, res, next) => {
   const origin = req.headers.origin;
+  // Allow: no origin (direct browser nav, same-origin), wildcard, or whitelisted origin
   if (
-    !allowedOrigins ||
-    allowedOrigins.includes("*") ||
-    (origin && allowedOrigins.includes(origin))
+    !origin ||                          // direct browser request (no origin header)
+    !allowedOrigins ||                  // no whitelist set
+    allowedOrigins.includes("*") ||     // wildcard
+    allowedOrigins.includes(origin)     // explicitly whitelisted
   ) {
-    res.setHeader("Access-Control-Allow-Origin", origin || "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET");
+    if (origin) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+    } else {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+    }
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     return next();
   }
-  res
-    .status(403)
-    .json({ success: false, message: "Forbidden: Origin not allowed" });
+  res.status(403).json({ success: false, message: "Forbidden: Origin not allowed" });
 });
 
 app.use(express.static(publicDir, { redirect: false }));
+app.use(express.json());
 
 const jsonResponse = (res, data, status = 200) =>
   res.status(status).json({ success: true, results: data });
