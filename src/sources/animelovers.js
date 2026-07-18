@@ -139,8 +139,10 @@ function calculateMatchScore(anilistData, candidate) {
   const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9\s]/gi, ' ').replace(/\s+/g, ' ').trim();
   const cTitle = normalize(candidate.title);
   
+  const allTitles = [...(anilistData.titles || []), ...(anilistData.synonyms || [])];
+  
   let bestTitleScore = 0;
-  for (const t of anilistData.titles || []) {
+  for (const t of allTitles) {
     if (!t) continue;
     const qTitle = normalize(t);
     if (qTitle === cTitle) {
@@ -175,7 +177,7 @@ function calculateMatchScore(anilistData, candidate) {
     return null;
   };
   let qSeasonNum = null;
-  for (const t of anilistData.titles || []) {
+  for (const t of allTitles) {
     const n = extractSeasonNum(t);
     if (n !== null) { qSeasonNum = n; break; }
   }
@@ -267,7 +269,14 @@ export async function getEpisodeStreamByTitle(anilistData, epNum) {
 
   let results = [];
   let query = "";
-  const titlesToSearch = (typeof anilistData === 'object' && anilistData.titles) ? anilistData.titles.slice(0, 3) : [anilistData];
+  
+  let titlesToSearch = [anilistData];
+  if (typeof anilistData === 'object') {
+    const tList = anilistData.titles || [];
+    const sList = anilistData.synonyms || [];
+    // Ambil maksimal 5 variasi judul utama + sinonim untuk dicari
+    titlesToSearch = [...tList, ...sList].filter(Boolean).slice(0, 5);
+  }
   
   // Helper: bersihkan special chars agar search engine AnimeLovers tidak bingung
   // Contoh: "THE LAST -NARUTO THE MOVIE-" → "THE LAST NARUTO THE MOVIE"
@@ -355,7 +364,14 @@ export async function getEpisodesByTitle(anilistData) {
 
   let results = [];
   let query = "";
-  const titlesToSearch = (typeof anilistData === 'object' && anilistData.titles) ? anilistData.titles.slice(0, 3) : [anilistData];
+  
+  let titlesToSearch = [anilistData];
+  if (typeof anilistData === 'object') {
+    const tList = anilistData.titles || [];
+    const sList = anilistData.synonyms || [];
+    // Ambil maksimal 5 variasi judul utama + sinonim untuk dicari
+    titlesToSearch = [...tList, ...sList].filter(Boolean).slice(0, 5);
+  }
   
   // Helper: bersihkan special chars agar search engine AnimeLovers tidak bingung
   const cleanForSearch = (s) => s.replace(/[^a-z0-9\s]/gi, ' ').replace(/\s+/g, ' ').trim();

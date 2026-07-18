@@ -11,38 +11,51 @@ const HEADERS = {
 
 async function getAnimekitaList() {
   console.log('Mengambil daftar seluruh anime dari AnimeLovers...');
-  let allAnimes = [];
-  let page = 1;
-  const perPage = 100;
+  const allAnimesMap = new Map();
+  // Trik untuk menyedot semua 4000+ anime: cari berdasarkan semua huruf vokal (karena hampir setiap judul punya vokal)
+  const keywords = ['a', 'i', 'u', 'e', 'o', ' ']; 
   
-  while (true) {
-    try {
-      const url = `https://apps.animekita.org/api/v1.2.5/search.php?keyword=a&page=${page}&per_page=${perPage}`;
-      const res = await axios.get(url, { headers: HEADERS });
-      const json = res.data;
-      const items = json.data?.[0]?.result || [];
-      
-      if (items.length === 0) break;
-      allAnimes.push(...items);
-      process.stdout.write(`\r- Menarik Halaman ${page} (Total sementara: ${allAnimes.length})`);
-      
-      if (items.length < perPage) break;
-      page++;
-      await new Promise(r => setTimeout(r, 300));
-    } catch (e) {
-      console.error(`\nGagal mengambil halaman ${page}:`, e.message);
-      break;
+  for (const kw of keywords) {
+    let page = 1;
+    let prevFirstUrl = null;
+    while (true) {
+      try {
+        const keywordUrl = kw === ' ' ? '%20' : kw;
+        // PENTING: API Animekita mentok maksimal 20 per halaman, berapapun per_page yang diminta!
+        const url = `https://apps.animekita.org/api/v1.2.5/search.php?keyword=${keywordUrl}&page=${page}&per_page=20`;
+        const res = await axios.get(url, { headers: HEADERS });
+        const items = res.data?.data?.[0]?.result || [];
+        
+        if (items.length === 0) break;
+        
+        const prevSize = allAnimesMap.size;
+        
+        // Simpan ke Map agar tidak ada anime duplikat
+        items.forEach(item => allAnimesMap.set(item.url, item));
+        process.stdout.write(`\r- Menarik "${kw === ' ' ? 'Spasi' : kw}" Halaman ${page} (Total sementara: ${allAnimesMap.size} anime)`);
+        
+        // Jika hasilnya kurang dari 20, atau API mentok dan mengulang data yang sama terus (infinite loop)
+        const currentFirstUrl = items[0]?.url;
+        if (items.length < 20 || currentFirstUrl === prevFirstUrl) break;
+        prevFirstUrl = currentFirstUrl;
+        
+        page++;
+        await new Promise(r => setTimeout(r, 100)); // Kasih jeda sedikit agar server tidak down
+      } catch (e) {
+        console.error(`\nGagal mengambil huruf "${kw}" halaman ${page}:`, e.message);
+        break;
+      }
     }
   }
-  console.log('\nSelesai menarik daftar anime.');
+  
+  const allAnimes = Array.from(allAnimesMap.values());
+  console.log(`\nSelesai! Berhasil mengumpulkan total ${allAnimes.length} anime unik dari server.`);
   return allAnimes;
 }
 
-// FUNGSI SKORING PINTAR (Mencegah Salah Season/Tahun/Format)
+// FUNGSI SKORING PINTAR (Di-upgrade menggunakan algoritma animelovers.js yang lebih akurat)
 function calculateMatchScore(anilistData, candidate) {
   let score = 0;
-  
-  // 1. TITLE MATCH (Max 40)
   const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9\s]/gi, ' ').replace(/\s+/g, ' ').trim();
   const cTitle = normalize(candidate.judul);
   
@@ -50,7 +63,9 @@ function calculateMatchScore(anilistData, candidate) {
   if (anilistData.title.romaji) aTitles.push(anilistData.title.romaji);
   if (anilistData.title.english) aTitles.push(anilistData.title.english);
   if (anilistData.title.native) aTitles.push(anilistData.title.native);
+  if (anilistData.synonyms) aTitles.push(...anilistData.synonyms);
   
+  // 1. TITLE MATCH (Max 40)
   let bestTitleScore = 0;
   for (const t of aTitles) {
     if (!t) continue;
@@ -62,18 +77,42 @@ function calculateMatchScore(anilistData, candidate) {
     const qWords = new Set(qTitle.split(' ').filter(w => w.length > 2));
     const cWords = cTitle.split(' ').filter(w => w.length > 2);
     if (qWords.size === 0 && cWords.length === 0) continue;
+    const cSet = new Set(cWords);
     const overlap = cWords.filter(w => qWords.has(w)).length;
-    const s = Math.round((overlap / Math.max(qWords.size, 1)) * 30);
+    const union = new Set([...qWords, ...cSet]).size;
+    const s = Math.round((overlap / Math.max(union, 1)) * 30); // Jaccard similarity murni
     if (s > bestTitleScore) bestTitleScore = s;
   }
   score += bestTitleScore;
 
-  // Penalti Season (Penting untuk akurasi 100%)
-  const seasonPattern = /\b(s\d+|season\s*\d+|part\s*\d+|[ivx]{2,}|\d+(st|nd|rd|th)\s*(season|part)|ii|iii|iv)\b/gi;
-  const qSeasons = (aTitles.join(' ').match(seasonPattern) || []).map(s => s.toLowerCase());
-  const cSeasons = (candidate.judul?.match(seasonPattern) || []).map(s => s.toLowerCase());
-  if (qSeasons.length > 0 && cSeasons.length === 0) score -= 20;
-  if (qSeasons.length === 0 && cSeasons.length > 0) score -= 30;
+  // Deteksi season mismatch (sangat fatal) — membandingkan NOMOR season
+  const extractSeasonNum = (text) => {
+    if (!text) return null;
+    const t = text.toLowerCase();
+    let m = t.match(/(?:s|season\s*)(\d+)/);
+    if (m) return parseInt(m[1]);
+    m = t.match(/(\d+)(?:st|nd|rd|th)\s*season/);
+    if (m) return parseInt(m[1]);
+    m = t.match(/part\s*(\d+)/);
+    if (m) return parseInt(m[1]);
+    if (/\biv\b/.test(t)) return 4;
+    if (/\biii\b/.test(t)) return 3;
+    if (/\bii\b/.test(t)) return 2;
+    return null;
+  };
+  let qSeasonNum = null;
+  for (const t of aTitles) {
+    const n = extractSeasonNum(t);
+    if (n !== null) { qSeasonNum = n; break; }
+  }
+  const cSeasonNum = extractSeasonNum(candidate.judul);
+  if (qSeasonNum !== null && cSeasonNum !== null) {
+    if (qSeasonNum !== cSeasonNum) score -= 40; // Beda nomor season = hampir pasti salah
+  } else if (qSeasonNum !== null && cSeasonNum === null) {
+    score -= 20;
+  } else if (qSeasonNum === null && cSeasonNum !== null) {
+    score -= 30;
+  }
 
   // 2. YEAR MATCH (Max 20)
   if (anilistData.seasonYear && candidate.rilis) {
@@ -86,7 +125,7 @@ function calculateMatchScore(anilistData, candidate) {
       } else if (Math.abs(cYear - aYear) === 1) {
         score += 10;
       } else {
-        score -= 30; // Beda tahun jauh = Diskualifikasi
+        score -= 20; 
       }
     }
   }
@@ -98,7 +137,7 @@ function calculateMatchScore(anilistData, candidate) {
     if ((aFormat === 'tv' && cFormat === 'tv') || (aFormat === 'movie' && cFormat === 'movie')) {
       score += 15;
     } else if (aFormat !== cFormat && ['tv', 'movie'].includes(aFormat) && ['tv', 'movie'].includes(cFormat)) {
-      score -= 30; // Jika beda format TV vs Movie, diskualifikasi
+      score -= 30;
     }
   }
 
@@ -111,16 +150,22 @@ function calculateMatchScore(anilistData, candidate) {
 
   // 5. TOTAL EPISODES (Max 10)
   if (anilistData.episodes && candidate.total_episode) {
-    if (parseInt(anilistData.episodes) === parseInt(candidate.total_episode)) {
+    const aEps = parseInt(anilistData.episodes);
+    const cEps = parseInt(candidate.total_episode);
+    if (aEps === cEps) {
       score += 10;
+    } else if (Math.abs(aEps - cEps) <= 2) {
+      score += 5; // Sedikit beda bisa karena special/recap
+    } else {
+      score -= 15; // Beda jauh = kemungkinan besar beda series/season
     }
   }
 
   // 6. STUDIO MATCH (Max 10)
   if (anilistData.studios?.nodes?.length > 0 && candidate.studio) {
-    const cStudio = normalize(candidate.studio);
+    const cStudio = normalize(candidate.studio).replace(/\s/g, '');
     const hasStudioMatch = anilistData.studios.nodes.some(st => {
-      const aStudio = normalize(st.name);
+      const aStudio = normalize(st.name).replace(/\s/g, '');
       return aStudio.includes(cStudio) || cStudio.includes(aStudio);
     });
     if (hasStudioMatch) score += 10;
@@ -135,7 +180,7 @@ function calculateMatchScore(anilistData, candidate) {
     else if (overlap === 1) score += 5;
   }
 
-  return Math.min(Math.max(score, 0), 100);
+  return Math.min(score, 100); // Bisa negatif untuk membantu filter
 }
 
 async function queryAnilistBatch(titles) {
@@ -150,6 +195,7 @@ async function queryAnilistBatch(titles) {
       media(search: $s${i}, type: ANIME) {
         id
         title { romaji english native }
+        synonyms
         seasonYear
         format
         status
@@ -215,8 +261,13 @@ async function run() {
   for (let i = 0; i < targetList.length; i += batchSize) {
     const batch = targetList.slice(i, i + batchSize);
     
-    // Jangan hapus season dari pencarian agar AniList bisa memberi hasil spesifik
-    const cleanTitles = batch.map(item => item.judul.replace(/\s*\(\d{4}\)\s*/g, '').trim());
+    // Jangan hapus season dari pencarian, tapi hilangkan karakter spesial (seperti ä, é) karena API AniList sering error
+    const cleanTitles = batch.map(item => 
+      item.judul
+        .replace(/\s*\(\d{4}\)\s*/g, '')
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .trim()
+    );
     
     process.stdout.write(`Memproses batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(targetList.length/batchSize)} ... `);
     
