@@ -78,7 +78,9 @@ export async function getStreamAnimelovers(id) {
   if (!json.data || json.data.length === 0) throw new Error("Video tidak ditemukan");
 
   const streams = json.data[0].streams;
+  const resoSize = json.data[0].resoSize || {};
   let sources = [];
+  let downloads = [];
 
   const BLOCKED = ["pixeldrain.com", "pixeldra.in"];
   const isBlocked = (url) => BLOCKED.some(d => url.includes(d));
@@ -88,12 +90,23 @@ export async function getStreamAnimelovers(id) {
       const best = links.find(s => s.link && !isBlocked(s.link))
         || links.find(s => s.link);
       if (best?.link) {
+        const type = best.link.includes(".m3u8") ? "hls" : "mp4";
         sources.push({
           quality,
           url: best.link,
-          type: best.link.includes(".m3u8") ? "hls" : "mp4",
+          type,
           server: "AnimeLovers"
         });
+        
+        // MP4 direct links can be used as download links
+        if (type === "mp4") {
+          downloads.push({
+            quality,
+            url: best.link,
+            size: resoSize[quality] || "Unknown",
+            server: "AnimeLovers (Direct)"
+          });
+        }
       }
     }
   }
@@ -106,8 +119,14 @@ export async function getStreamAnimelovers(id) {
     const bi = qualityOrder.indexOf(b.quality);
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
   });
+  
+  downloads.sort((a, b) => {
+    const ai = qualityOrder.indexOf(a.quality);
+    const bi = qualityOrder.indexOf(b.quality);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
 
-  return { sources };
+  return { sources, downloads };
 }
 
 /**
@@ -240,7 +259,7 @@ export async function getEpisodeStreamByTitle(anilistData, epNum) {
         const targetEp = info.episodes.find(ep => String(ep.episodeNumber) === String(epNum));
         if (targetEp) {
           const stream = await getStreamAnimelovers(targetEp.id);
-          return { animeId: mappedSlug, animeTitle: info.title, episodeId: targetEp.id, sources: stream.sources };
+          return { animeId: mappedSlug, animeTitle: info.title, episodeId: targetEp.id, sources: stream.sources, downloads: stream.downloads };
         }
       }
     }
@@ -306,7 +325,7 @@ export async function getEpisodeStreamByTitle(anilistData, epNum) {
         continue;
       }
       const stream = await getStreamAnimelovers(targetEp.id);
-      return { animeId: candidate.id, animeTitle: info.title, episodeId: targetEp.id, sources: stream.sources };
+      return { animeId: candidate.id, animeTitle: info.title, episodeId: targetEp.id, sources: stream.sources, downloads: stream.downloads };
     } catch (err) {
       lastError = err.message;
     }

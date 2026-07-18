@@ -3,8 +3,8 @@ import * as cheerio from 'cheerio';
 import https from 'https';
 import { getMapping } from '../utils/mappings.js';
 
-const agent = new https.Agent({ 
-  rejectUnauthorized: false 
+const agent = new https.Agent({
+  rejectUnauthorized: false
 });
 
 // Fungsi untuk unpack script packed odvidhide.com dll.
@@ -28,20 +28,20 @@ export async function searchOtakudesu(query) {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
       }
     });
-    
+
     const $ = cheerio.load(res.data);
     const results = [];
-    
+
     $('.chivsrc li').each((i, el) => {
       const title = $(el).find('h2').text().trim();
       const link = $(el).find('h2 a').attr('href');
       const image = $(el).find('img').attr('src');
-      
+
       if (title && link) {
         // Otakudesu link: https://otakudesu.blog/anime/attack-on-titan-sub-indo/
         const idMatch = link.match(/\/anime\/([^\/]+)/);
         const id = idMatch ? idMatch[1] : null;
-        
+
         if (id) {
           results.push({
             id,
@@ -52,7 +52,7 @@ export async function searchOtakudesu(query) {
         }
       }
     });
-    
+
     return results;
   } catch (error) {
     console.error(`[Otakudesu] Search error for "${query}":`, error.message);
@@ -69,13 +69,13 @@ export async function getInfoOtakudesu(id) {
         'User-Agent': 'Mozilla/5.0'
       }
     });
-    
+
     const $ = cheerio.load(res.data);
-    
+
     const title = $('.venser .fotoanime .infozin .infozingle p').first().text().replace('Judul: ', '').trim() || $('.jdlrx h1').text().trim();
     const image = $('.venser .fotoanime img').attr('src');
     const synopsis = $('.venser .fotoanime .sinopc p').toArray().map(el => $(el).text().trim()).join('\n');
-    
+
     // Parse info details
     const info = {};
     $('.venser .fotoanime .infozin .infozingle p').each((i, el) => {
@@ -89,20 +89,20 @@ export async function getInfoOtakudesu(id) {
     });
 
     const episodes = [];
-    
+
     $('.episodelist ul li').each((i, el) => {
       const epTitle = $(el).find('span a').text().trim();
       const link = $(el).find('span a').attr('href');
       const date = $(el).find('.zeebr').text().trim();
-      
+
       if (epTitle && link && !epTitle.toLowerCase().includes('batch')) {
         const epIdMatch = link.match(/\/episode\/([^\/]+)/);
         const epId = epIdMatch ? epIdMatch[1] : null;
-        
+
         // Extract episode number from title (usually like "Attack on Titan Episode 1 Sub Indo")
         let epNumMatch = epTitle.match(/Episode\s+(\d+)/i);
         let epNum = epNumMatch ? Number(epNumMatch[1]) : (episodes.length + 1);
-        
+
         if (epId) {
           episodes.push({
             id: epId,
@@ -114,10 +114,10 @@ export async function getInfoOtakudesu(id) {
         }
       }
     });
-    
+
     // Biasanya urutannya dari terbaru (descending), balikkan jadi ascending (1,2,3)
     episodes.reverse();
-    
+
     return {
       id,
       title,
@@ -144,20 +144,20 @@ export async function getStreamOtakudesu(episodeId) {
       httpsAgent: agent,
       headers: { 'User-Agent': 'Mozilla/5.0' }
     });
-    
+
     const $ = cheerio.load(res.data);
     const sources = [];
-    
+
     // Mencari link download MP4
     // Struktur biasanya: .download ul li
     $('.download ul li').each((i, el) => {
       const resolution = $(el).find('strong').text().trim(); // misal "Mp4 720p" atau "360p"
-      
+
       // Ambil link-link yang ada di sebelahnya (Zippyshare, dll)
       $(el).find('a').each((j, aEl) => {
         const providerName = $(aEl).text().trim(); // misal "Zippyshare", "DesuDrive", "Mp4upload"
         const href = $(aEl).attr('href');
-        
+
         if (href) {
           // Sengaja tidak memasukkan link download (Zippyshare dll) 
           // karena frontend (NEETflix) mengharapkan link murni mp4/iframe,
@@ -165,7 +165,7 @@ export async function getStreamOtakudesu(episodeId) {
         }
       });
     });
-    
+
     // Juga ekstrak iframe stream jika ada
     const iframe = $('#lightsVideo iframe').attr('src') || $('.responsive-embed-stream iframe').attr('src');
     if (iframe) {
@@ -188,20 +188,20 @@ export async function getStreamOtakudesu(episodeId) {
         else if (iframe.includes('odvidhide.com') || iframe.includes('vidhide')) {
           let directUrl = null;
           let directType = 'mp4';
-          
+
           const match = iframeRes.data.match(/return p}\('(.*?)',(\d+),(\d+),'(.*?)'\.split\('\|'\)/);
           if (match) {
             const unpacked = unpack(match[1], parseInt(match[2]), parseInt(match[3]), match[4].split('|'), 0, {});
             const m3u8Match = unpacked.match(/(https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*)/i) || unpacked.match(/file:\s*["'](.*?)["']/);
             const mp4Match = unpacked.match(/(https?:\/\/[^\s"'<>]+\.mp4[^\s"'<>]*)/i);
-            
+
             if (m3u8Match) { directUrl = m3u8Match[1]; directType = 'hls'; }
             else if (mp4Match) { directUrl = mp4Match[1]; directType = 'mp4'; }
           } else {
             const m3u8Direct = iframeRes.data.match(/file:\s*["'](.*?)["']/);
             if (m3u8Direct) { directUrl = m3u8Direct[1]; directType = 'hls'; }
           }
-          
+
           if (directUrl) {
             sources.push({ quality: 'auto', provider: 'Otakudesu', url: directUrl, type: directType });
           }
@@ -387,7 +387,7 @@ export async function getEpisodesByTitle(anilistData) {
     try {
       const info = await getInfoOtakudesu(candidate.id);
       if (!info.episodes || info.episodes.length === 0) continue;
-      
+
       const finalScore = (typeof anilistData === 'object') ? calculateMatchScore(anilistData, info) : candidate.score;
       detailedCandidates.push({ info, finalScore });
     } catch (err) {
@@ -461,11 +461,11 @@ export async function getEpisodeStreamByTitle(anilistData, epNum) {
     try {
       const info = await getInfoOtakudesu(candidate.id);
       if (!info.episodes || info.episodes.length === 0) continue;
-      
+
       const targetEp = info.episodes.find(ep => String(ep.episodeNumber) === String(epNum))
         ?? (String(epNum) === '1' && info.episodes.length === 1 ? info.episodes[0] : null)
         ?? (String(epNum) === '1' ? info.episodes.find(ep => /^(movie|ova|special|film)/i.test(String(ep.episodeNumber))) : null);
-      
+
       if (!targetEp) continue;
 
       const finalScore = (typeof anilistData === 'object') ? calculateMatchScore(anilistData, info) : candidate.score;
