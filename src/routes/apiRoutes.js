@@ -11,6 +11,16 @@ import {
   getEpisodesByTitle as getOdEpisodesByTitle, 
   getEpisodeStreamByTitle as getOdEpisodeStreamByTitle 
 } from "../sources/otakudesu.js";
+import {
+  getLatestComics,
+  searchComics,
+  getComicInfo,
+  getComicChapter,
+  getProxyImage,
+  getComicHomeInfo,
+  getComicCategory,
+  getComicByGenre
+} from "../sources/komikcast.js";
 import * as categoryController from "../controllers/category.controller.js";
 import * as topTenController from "../controllers/topten.controller.js";
 import * as animeInfoController from "../controllers/animeInfo.controller.js";
@@ -87,6 +97,39 @@ export const createApiRoutes = (app, jsonResponse, jsonError) => {
       }
     });
   });
+
+  // Comic Routes
+  app.get("/api/komiku/home", async (req, res) => {
+    try {
+      const data = await getComicHomeInfo();
+      return jsonResponse(res, data);
+    } catch (err) {
+      return jsonError(res, err.message);
+    }
+  });
+
+  app.get("/api/komiku/category/:type", async (req, res) => {
+    try {
+      const { type } = req.params;
+      const page = req.query.page || 1;
+      const data = await getComicCategory(type, page);
+      return jsonResponse(res, data);
+    } catch (err) {
+      return jsonError(res, err.message);
+    }
+  });
+
+  app.get("/api/komiku/genre/:genre", async (req, res) => {
+    try {
+      const { genre } = req.params;
+      const page = req.query.page || 1;
+      const data = await getComicByGenre(genre, page);
+      return jsonResponse(res, data);
+    } catch (err) {
+      return jsonError(res, err.message);
+    }
+  });
+
 
   routeTypes.forEach((routeType) =>
     createRoute(`/api/${routeType}`, (req, res) =>
@@ -214,4 +257,34 @@ export const createApiRoutes = (app, jsonResponse, jsonError) => {
     if (!payload) throw new Error("Payload (body) wajib diisi");
     return await getOdEpisodesByTitle(payload);
   });
+
+  // ==========================================
+  // KOMIKU ROUTES (MANGA/MANHWA)
+  // ==========================================
+
+  createRoute("/api/komiku/latest", async (req) => {
+    const { page = 1 } = req.query;
+    return await getLatestComics(page);
+  });
+
+  createRoute("/api/komiku/search", async (req) => {
+    const { q, page = 1 } = req.query;
+    if (!q) throw new Error("Parameter 'q' wajib diisi");
+    return await searchComics(q, page);
+  });
+
+  createRoute("/api/komiku/info", async (req) => {
+    const { id } = req.query;
+    if (!id) throw new Error("Parameter 'id' wajib diisi");
+    return await getComicInfo(id);
+  });
+
+  createRoute("/api/komiku/chapter", async (req) => {
+    const { id } = req.query;
+    if (!id) throw new Error("Parameter 'id' wajib diisi");
+    return await getComicChapter(id);
+  });
+
+  // Proxy Endpoint untuk bypass hotlink protection Komiku
+  app.get("/api/komiku/image", getProxyImage);
 };
