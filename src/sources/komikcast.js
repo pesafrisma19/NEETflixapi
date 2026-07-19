@@ -1,6 +1,18 @@
 import axios from "axios";
 
 const BASE_URL = "https://be.komikcast.cc";
+import https from "https";
+
+const agent = new https.Agent({
+    rejectUnauthorized: false
+});
+
+const getHeaders = () => ({
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9,id;q=0.8",
+    "Referer": "https://komikcast.cc/"
+});
 
 // Helper to map Komikcast JSON to Anime-like format
 const mapToAnimeFormat = (series) => {
@@ -24,11 +36,11 @@ const mapToAnimeFormat = (series) => {
 export async function getComicHomeInfo() {
   try {
     const [popularRes, hotRes, mangaRes, manhwaRes, genresRes] = await Promise.all([
-      axios.get(`${BASE_URL}/popular`).catch(() => ({ data: { data: [] } })),
-      axios.get(`${BASE_URL}/series?isHot=true`).catch(() => ({ data: { data: [] } })),
-      axios.get(`${BASE_URL}/series?format=manga`).catch(() => ({ data: { data: [] } })),
-      axios.get(`${BASE_URL}/series?format=manhwa`).catch(() => ({ data: { data: [] } })),
-      axios.get(`${BASE_URL}/genres`).catch(() => ({ data: { data: [] } }))
+      axios.get(`${BASE_URL}/popular`, { headers: getHeaders(), httpsAgent: agent }).catch(() => ({ data: { data: [] } })),
+      axios.get(`${BASE_URL}/series?isHot=true`, { headers: getHeaders(), httpsAgent: agent }).catch(() => ({ data: { data: [] } })),
+      axios.get(`${BASE_URL}/series?format=manga`, { headers: getHeaders(), httpsAgent: agent }).catch(() => ({ data: { data: [] } })),
+      axios.get(`${BASE_URL}/series?format=manhwa`, { headers: getHeaders(), httpsAgent: agent }).catch(() => ({ data: { data: [] } })),
+      axios.get(`${BASE_URL}/genres`, { headers: getHeaders(), httpsAgent: agent }).catch(() => ({ data: { data: [] } }))
     ]);
 
     const popular = popularRes.data.data || [];
@@ -58,9 +70,10 @@ export async function getComicCategory(type, page = 1) {
     if (type === 'manga') url = `${BASE_URL}/series?format=manga&page=${page}`;
     if (type === 'manhwa') url = `${BASE_URL}/series?format=manhwa&page=${page}`;
     if (type === 'popular') url = `${BASE_URL}/popular?page=${page}`;
-
-    const res = await axios.get(url);
-    const results = (res.data.data || []).map(mapToAnimeFormat);
+    if (type === 'project') url = `${BASE_URL}/series?type=project&page=${page}`;
+    
+    const { data } = await axios.get(url, { headers: getHeaders(), httpsAgent: agent });
+    const results = (data.data || []).map(mapToAnimeFormat);
     return {
       currentPage: page,
       hasNextPage: results.length >= 10, // komikcast defaults to 10
@@ -92,46 +105,60 @@ export async function getComicByGenre(genre, page = 1) {
 
 // Keep the old ones for compatibility during transition
 export async function getLatestComics() {
-  const res = await axios.get(`${BASE_URL}/series`);
+  const res = await axios.get(`${BASE_URL}/series`, { headers: getHeaders(), httpsAgent: agent });
   return res.data.data.map(mapToAnimeFormat);
 }
 
-export async function searchComics(query) {
-  const res = await axios.get(`${BASE_URL}/series?title=${encodeURIComponent(query)}`);
-  return res.data.data.map(mapToAnimeFormat);
+export async function searchComics(keyword, page = 1) {
+  try {
+    const { data } = await axios.get(`${BASE_URL}/series?search=${encodeURIComponent(keyword)}&page=${page}`, { headers: getHeaders(), httpsAgent: agent });
+    return data.data.map(mapToAnimeFormat);
+  } catch (error) {
+    return [];
+  }
 }
 
-export async function getComicInfo(slug) {
-  const infoRes = await axios.get(`${BASE_URL}/series/${slug}`);
-  const series = infoRes.data.data;
-  const chaptersRes = await axios.get(`${BASE_URL}/series/${slug}/chapters`);
-  const rawChapters = chaptersRes.data.data || [];
+export async function getComicInfo(id) {
+  try {
+    const { data } = await axios.get(`${BASE_URL}/series/${id}`, { headers: getHeaders(), httpsAgent: agent });
+    const series = data;
+    const chaptersRes = await axios.get(`${BASE_URL}/series/${id}/chapters`, { headers: getHeaders(), httpsAgent: agent });
+    const rawChapters = chaptersRes.data.data || [];
 
-  return {
-    id: series.data.slug,
-    title: series.data.title,
-    image: series.data.coverImage,
-    author: series.data.author || 'Unknown',
-    status: series.data.status,
-    type: series.data.format || 'Manga',
-    rating: series.data.rating ? series.data.rating.toString() : '?',
-    genres: series.data.genres ? series.data.genres.map(g => g.data.name) : [],
-    synopsis: series.data.synopsis || 'Sinopsis belum tersedia.',
-    chapters: rawChapters.map(ch => ({
-      id: `${slug}__${ch.data.index}`,
-      title: ch.data.title ? `Chapter ${ch.data.index} - ${ch.data.title}` : `Chapter ${ch.data.index}`
-    })).sort((a, b) => {
-      const idxA = parseFloat(a.id.split('__')[1]);
-      const idxB = parseFloat(b.id.split('__')[1]);
-      return idxB - idxA;
-    })
-  };
+    return {
+      id: series.data.slug,
+      title: series.data.title,
+      image: series.data.coverImage,
+      author: series.data.author || 'Unknown',
+      status: series.data.status,
+      type: series.data.format || 'Manga',
+      rating: series.data.rating ? series.data.rating.toString() : '?',
+      genres: series.data.genres ? series.data.genres.map(g => g.data.name) : [],
+      synopsis: series.data.synopsis || 'Sinopsis belum tersedia.',
+      chapters: rawChapters.map(ch => ({
+        id: `${id}__${ch.data.index}`,
+        title: ch.data.title ? `Chapter ${ch.data.index} - ${ch.data.title}` : `Chapter ${ch.data.index}`
+      })).sort((a, b) => {
+        const idxA = parseFloat(a.id.split('__')[1]);
+        const idxB = parseFloat(b.id.split('__')[1]);
+        return idxB - idxA;
+      })
+    };
+  } catch (error) {
+    console.error("Error in getComicInfo:", error.message);
+    throw error;
+  }
 }
 
 export async function getComicChapter(compositeId) {
-  const [slug, index] = compositeId.split('__');
-  const res = await axios.get(`${BASE_URL}/series/${slug}/chapters/${index}`);
-  return { id: compositeId, images: res.data.data.data.images || [] };
+  try {
+    const [slug, index] = compositeId.split('__');
+    const res = await axios.get(`${BASE_URL}/series/${slug}/chapters/${index}`, { headers: getHeaders(), httpsAgent: agent });
+    return { id: compositeId, images: res.data.data.data.images || [] };
+  } catch (error) {
+    console.error("Error in getComicChapter:", error.message);
+    throw error;
+  }
 }
 
 export async function getProxyImage(req, res) {

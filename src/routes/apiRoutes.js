@@ -21,6 +21,7 @@ import {
   getComicCategory,
   getComicByGenre
 } from "../sources/komikcast.js";
+import lk21 from "../sources/lk21.js";
 import * as categoryController from "../controllers/category.controller.js";
 import * as topTenController from "../controllers/topten.controller.js";
 import * as animeInfoController from "../controllers/animeInfo.controller.js";
@@ -287,4 +288,30 @@ export const createApiRoutes = (app, jsonResponse, jsonError) => {
 
   // Proxy Endpoint untuk bypass hotlink protection Komiku
   app.get("/api/komiku/image", getProxyImage);
+
+  // ==========================================
+  // LK21 ROUTES (MOVIES/SERIES)
+  // ==========================================
+
+  createRoute("/api/lk21/home", async (req) => {
+    return await lk21.getHomeData();
+  });
+
+  createRoute("/api/lk21/search", async (req) => {
+    const { q, page = 1 } = req.query;
+    if (!q) throw new Error("Parameter 'q' wajib diisi");
+    return await lk21.searchMovies(q, page);
+  });
+
+  createRoute("/api/lk21/info", async (req) => {
+    const { id } = req.query;
+    if (!id) throw new Error("Parameter 'id' wajib diisi");
+    return await lk21.getMovieDetails(id);
+  });
+
+  createRoute("/api/lk21/stream", async (req) => {
+    const { id } = req.query;
+    if (!id) throw new Error("Parameter 'id' wajib diisi");
+    return await lk21.getMovieStream(id);
+  });
 };
