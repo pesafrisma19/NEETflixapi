@@ -111,7 +111,7 @@ export async function getLatestComics() {
 
 export async function searchComics(keyword, page = 1) {
   try {
-    const { data } = await axios.get(`${BASE_URL}/series?search=${encodeURIComponent(keyword)}&page=${page}`, { headers: getHeaders(), httpsAgent: agent });
+    const { data } = await axios.get(`${BASE_URL}/series?title=${encodeURIComponent(keyword)}&page=${page}`, { headers: getHeaders(), httpsAgent: agent });
     return data.data.map(mapToAnimeFormat);
   } catch (error) {
     return [];
@@ -121,7 +121,7 @@ export async function searchComics(keyword, page = 1) {
 export async function getComicInfo(id) {
   try {
     const { data } = await axios.get(`${BASE_URL}/series/${id}`, { headers: getHeaders(), httpsAgent: agent });
-    const series = data;
+    const series = data.data;
     const chaptersRes = await axios.get(`${BASE_URL}/series/${id}/chapters`, { headers: getHeaders(), httpsAgent: agent });
     const rawChapters = chaptersRes.data.data || [];
 
@@ -170,10 +170,8 @@ export async function getProxyImage(req, res) {
       url: imageUrl,
       method: 'GET',
       responseType: 'stream',
-      headers: {
-        'Referer': 'https://komikcast.cc/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64 AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36)'
-      }
+      headers: getHeaders(),
+      httpsAgent: agent
     });
 
     res.set('Content-Type', response.headers['content-type']);

@@ -1,6 +1,8 @@
 import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -14,6 +16,22 @@ const PORT = process.env.PORT || 4444;
 const __filename = fileURLToPath(import.meta.url);
 const publicDir = path.join(dirname(__filename), "public");
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",");
+
+// 1. Helmet: Protect against well-known web vulnerabilities by setting HTTP headers appropriately
+// We disable crossOriginEmbedderPolicy so images from other domains can load if needed
+app.use(helmet({ crossOriginEmbedderPolicy: false }));
+
+// 2. Rate Limiting: Limit each IP to 100 requests per minute
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: { success: false, message: "Terlalu banyak permintaan dari IP ini, coba lagi dalam 1 menit (Anti-Spam/DDoS protection active)." },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
+
+// Apply rate limiter to all API routes
+app.use('/api', apiLimiter);
 
 app.use(
   cors({

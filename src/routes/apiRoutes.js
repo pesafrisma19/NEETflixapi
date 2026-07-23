@@ -5,11 +5,11 @@ import {
   getStreamAnimelovers,
 } from "../sources/animelovers.js";
 import { getEpisodesByTitle, getEpisodeStreamByTitle } from "../sources/animelovers.js";
-import { 
+import {
   searchOtakudesu,
   getInfoOtakudesu,
-  getEpisodesByTitle as getOdEpisodesByTitle, 
-  getEpisodeStreamByTitle as getOdEpisodeStreamByTitle 
+  getEpisodesByTitle as getOdEpisodesByTitle,
+  getEpisodeStreamByTitle as getOdEpisodeStreamByTitle
 } from "../sources/otakudesu.js";
 import {
   getLatestComics,
@@ -22,6 +22,24 @@ import {
   getComicByGenre
 } from "../sources/komikcast.js";
 import lk21 from "../sources/lk21.js";
+import {
+  searchAnichin,
+  getInfoAnichin,
+  getStreamAnichin,
+  getRecentAnichin,
+  getRecommendationsAnichin,
+  getMoviesAnichin,
+  getGenreAnichin
+} from "../sources/anichin.js";
+import {
+  searchDramabox,
+  getInfoDramabox,
+  getStreamDramabox,
+  getRecentDramabox,
+  getRecommendationsDramabox,
+  getMoviesDramabox,
+  getGenreDramabox
+} from "../sources/dramabox.js";
 import * as categoryController from "../controllers/category.controller.js";
 import * as topTenController from "../controllers/topten.controller.js";
 import * as animeInfoController from "../controllers/animeInfo.controller.js";
@@ -297,6 +315,13 @@ export const createApiRoutes = (app, jsonResponse, jsonError) => {
     return await lk21.getHomeData();
   });
 
+  createRoute("/api/lk21/category/:type", async (req) => {
+    const { type } = req.params;
+    const { page = 1 } = req.query;
+    if (!type) throw new Error("Parameter 'type' wajib diisi");
+    return await lk21.getCategory(type, page);
+  });
+
   createRoute("/api/lk21/search", async (req) => {
     const { q, page = 1 } = req.query;
     if (!q) throw new Error("Parameter 'q' wajib diisi");
@@ -314,4 +339,92 @@ export const createApiRoutes = (app, jsonResponse, jsonError) => {
     if (!id) throw new Error("Parameter 'id' wajib diisi");
     return await lk21.getMovieStream(id);
   });
+
+  // ==========================================
+  // ANICHIN ROUTES
+  // ==========================================
+
+  createRoute("/api/anichin/search", async (req) => {
+    const { q, page = 1 } = req.query;
+    if (!q) throw new Error("Parameter 'q' wajib diisi");
+    return await searchAnichin(q, page);
+  });
+
+  createRoute("/api/anichin/info", async (req) => {
+    const { id } = req.query;
+    if (!id) throw new Error("Parameter 'id' wajib diisi");
+    return await getInfoAnichin(id);
+  });
+
+  createRoute("/api/anichin/stream", async (req) => {
+    const { id } = req.query;
+    const clientIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress;
+    if (!id) throw new Error("Parameter 'id' wajib diisi");
+    return await getStreamAnichin(id, clientIp);
+  });
+
+  createRoute("/api/anichin/recent", async (req) => {
+    const { page = 1 } = req.query;
+    return await getRecentAnichin(page);
+  });
+
+  createRoute("/api/anichin/recommendations", async (req) => {
+    const { page = 1 } = req.query;
+    return await getRecommendationsAnichin(page);
+  });
+
+  createRoute("/api/anichin/movies", async (req) => {
+    const { page = 1 } = req.query;
+    return await getMoviesAnichin(page);
+  });
+
+  createRoute("/api/anichin/genre", async (req) => {
+    const { id, page = 1 } = req.query;
+    if (!id) throw new Error("Parameter 'id' (genreSlug) wajib diisi");
+    return await getGenreAnichin(id, page);
+  });
+
+  // ==========================================
+  // DRAMABOX ROUTES
+  // ==========================================
+
+  createRoute("/api/dramabox/search", async (req) => {
+    const { q, page = 1 } = req.query;
+    if (!q) throw new Error("Parameter 'q' wajib diisi");
+    return await searchDramabox(q, page);
+  });
+
+  createRoute("/api/dramabox/info", async (req) => {
+    const { id } = req.query;
+    if (!id) throw new Error("Parameter 'id' wajib diisi");
+    return await getInfoDramabox(id);
+  });
+
+  createRoute("/api/dramabox/stream", async (req) => {
+    const { id } = req.query;
+    if (!id) throw new Error("Parameter 'id' wajib diisi");
+    return await getStreamDramabox(id);
+  });
+
+  createRoute("/api/dramabox/recent", async (req) => {
+    const { page = 1 } = req.query;
+    return await getRecentDramabox(page);
+  });
+
+  createRoute("/api/dramabox/recommendations", async (req) => {
+    const { page = 1 } = req.query;
+    return await getRecommendationsDramabox(page);
+  });
+
+  createRoute("/api/dramabox/movies", async (req) => {
+    const { page = 1 } = req.query;
+    return await getMoviesDramabox(page);
+  });
+
+  createRoute("/api/dramabox/genre", async (req) => {
+    const { id, page = 1 } = req.query;
+    if (!id) throw new Error("Parameter 'id' wajib diisi");
+    return await getGenreDramabox(id, page);
+  });
+
 };

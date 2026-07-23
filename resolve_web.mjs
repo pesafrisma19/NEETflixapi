@@ -139,6 +139,12 @@ const htmlTemplate = `
     .candidate-meta { font-size: 11px; color: #94a3b8; }
     
     .loading { text-align: center; padding: 20px; color: #94a3b8; }
+
+    @media (max-width: 768px) {
+      body { height: auto; overflow-y: auto; }
+      .container { flex-direction: column; overflow: visible; }
+      .left-panel, .mid-panel, .right-panel { flex: none; width: 100%; box-sizing: border-box; }
+    }
   </style>
 </head>
 <body>
@@ -244,7 +250,11 @@ const htmlTemplate = `
             <div class="synopsis">\${info.synopsis || 'Tidak ada sinopsis.'}</div>
           </div>
         </div>
-        <div class="controls">
+        <div class="controls" style="flex-direction: column; gap: 8px;">
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="customIdInput" placeholder="ID Manual / Custom (cth: 111110 / custom-onepiece)" style="flex: 1; padding: 8px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: white; font-size: 12px;">
+            <button class="btn" style="background: #10b981; flex: initial; padding: 8px 15px;" onclick="saveCustomMapping()">➕ Simpan Custom ID</button>
+          </div>
           <button class="btn btn-delete" onclick="doAction('delete')">🗑️ Hapus dari Antrean</button>
         </div>
       \`;
@@ -255,7 +265,11 @@ const htmlTemplate = `
           <div>ID: \${slug}</div>
           <div style="color:#ef4444; margin-top:10px;">Gagal memuat detail dari API Animekita.</div>
         </div>
-        <div class="controls">
+        <div class="controls" style="flex-direction: column; gap: 8px;">
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="customIdInput" placeholder="ID Manual / Custom (cth: 111110 / custom-onepiece)" style="flex: 1; padding: 8px; border-radius: 8px; border: 1px solid #475569; background: #1e293b; color: white; font-size: 12px;">
+            <button class="btn" style="background: #10b981; flex: initial; padding: 8px 15px;" onclick="saveCustomMapping()">➕ Simpan Custom ID</button>
+          </div>
           <button class="btn btn-delete" onclick="doAction('delete')">🗑️ Hapus dari Antrean</button>
         </div>
       \`;
@@ -332,7 +346,7 @@ const htmlTemplate = `
 
   async function saveMapping(anilistId, anilistTitle) {
     if(!currentItem) return;
-    if (!confirm(\`PASANGKAN?\\n\\nAnimekita: \${currentItem.judul}\\nAniList: \${anilistTitle}\`)) return;
+    if (!confirm('PASANGKAN?\\n\\nAnimekita: ' + currentItem.judul + '\\nAniList: ' + anilistTitle)) return;
     
     await fetch('/api/action', {
       method: 'POST',
@@ -340,6 +354,23 @@ const htmlTemplate = `
       body: JSON.stringify({ action: 'save', id: anilistId, slug: currentItem.slug })
     });
     
+    removeItemFromList();
+  }
+
+  async function saveCustomMapping() {
+    if(!currentItem) return;
+    const input = document.getElementById('customIdInput');
+    const customId = input ? input.value.trim() : '';
+    if (!customId) return alert('Masukkan ID Manual/Custom terlebih dahulu!');
+    
+    if (!confirm('PASANGKAN SECARA CUSTOM?\\n\\nAnimekita: ' + currentItem.judul + '\\nCustom ID: ' + customId)) return;
+
+    await fetch('/api/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'save', id: customId, slug: currentItem.slug })
+    });
+
     removeItemFromList();
   }
   

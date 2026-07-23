@@ -34,9 +34,9 @@ async function getAnimekitaList() {
         items.forEach(item => allAnimesMap.set(item.url, item));
         process.stdout.write(`\r- Menarik "${kw === ' ' ? 'Spasi' : kw}" Halaman ${page} (Total sementara: ${allAnimesMap.size} anime)`);
         
-        // Jika hasilnya kurang dari 20, atau API mentok dan mengulang data yang sama terus (infinite loop)
+        // Hentikan jika tidak ada anime baru yang bertambah atau sudah mencapai batas halaman
         const currentFirstUrl = items[0]?.url;
-        if (items.length < 20 || currentFirstUrl === prevFirstUrl) break;
+        if (items.length < 20 || currentFirstUrl === prevFirstUrl || allAnimesMap.size === prevSize || page > 30) break;
         prevFirstUrl = currentFirstUrl;
         
         page++;

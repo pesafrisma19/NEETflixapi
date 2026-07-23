@@ -77,7 +77,56 @@ const getHomeData = async () => {
 
 const searchMovies = async (keyword, page = 1) => {
     try {
-        const url = page > 1 ? `${LK21_BASE_URL}/page/${page}/?s=${encodeURIComponent(keyword)}` : `${LK21_BASE_URL}/?s=${encodeURIComponent(keyword)}`;
+        const url = `https://gudangvape.com/search.php?s=${encodeURIComponent(keyword)}&page=${page}`;
+        const { data } = await axios.get(url, { 
+            headers: {
+                ...getHeaders(),
+                "Origin": LK21_BASE_URL,
+                "Referer": LK21_BASE_URL + "/"
+            }, 
+            httpsAgent: agent 
+        });
+        
+        const items = [];
+        const seen = new Set();
+        
+        if (data && data.data && Array.isArray(data.data)) {
+            data.data.forEach(item => {
+                const id = item.slug;
+                if (id && !seen.has(id)) {
+                    seen.add(id);
+                    items.push({
+                        id: id,
+                        title: item.title,
+                        image: item.poster ? `https://poster.showcdnx.com/wp-content/uploads/${item.poster}` : null,
+                        rating: item.rating ? item.rating.toString() : null,
+                        episode: item.type === 'series' && item.episode ? `EPS ${item.episode}` : null
+                    });
+                }
+            });
+        }
+        
+        return {
+            status: "success",
+            data: items
+        };
+    } catch (error) {
+        console.error("Error scraping LK21 Search:", error.message);
+        return { status: "error", message: error.message };
+    }
+};
+
+const getCategory = async (type, page = 1) => {
+    try {
+        let typePath = type;
+        if (type === 'release') typePath = 'latest';
+        else if (type === 'populer' || type === 'latest-series' || type === 'top-series-today') typePath = type;
+        else if (!type.includes('/')) {
+            // Assume it's a genre if no path is specified
+            typePath = `genre/${type}`;
+        }
+        
+        const url = page > 1 ? `${LK21_BASE_URL}/${typePath}/page/${page}/` : `${LK21_BASE_URL}/${typePath}/`;
         const { data } = await axios.get(url, { headers: getHeaders(), httpsAgent: agent });
         const $ = cheerio.load(data);
         
@@ -85,26 +134,45 @@ const searchMovies = async (keyword, page = 1) => {
         const seen = new Set();
         
         $('.search-item, .grid-archive .item, article').each((i, el) => {
-            let title = $(el).find('h2, h3').text().trim() || $(el).find('a').attr('title');
+            let title = $(el).find('a').attr('title');
+            if (!title) title = $(el).find('.poster-title, h2, h3, h4').first().text().trim();
             let link = $(el).find('a').attr('href');
             let img = $(el).find('img').attr('data-src') || $(el).find('img').attr('src');
             let rating = $(el).find('.rating').text().trim() || null;
+            let ep = $(el).find('.episode').text().trim() || null;
             
             if (title && link && link.includes('/')) {
-                const id = link.replace(LK21_BASE_URL, '').replace(/^\/+/, '').replace(/\/+$/, '');
-                // only add if it looks like a valid movie/series link, not a genre or year link
-                if (id && !id.startsWith('genre') && !id.startsWith('year') && !id.startsWith('country')) {
-                    if (!seen.has(id)) {
-                        seen.add(id);
-                        items.push({ id, title, image: img, rating });
+                try {
+                    const parsedUrl = new URL(link, LK21_BASE_URL);
+                    const id = parsedUrl.pathname.replace(/^\/+/, '').replace(/\/+$/, '');
+                    if (id && !id.startsWith('genre') && !id.startsWith('year') && !id.startsWith('country')) {
+                        if (!seen.has(id)) {
+                            seen.add(id);
+                            items.push({ 
+                                id, 
+                                title, 
+                                image: img, 
+                                rating,
+                                episode: ep
+                            });
+                        }
                     }
+                } catch (e) {
+                    // Invalid URL
                 }
             }
         });
+
+        // Determine if there's a next page by looking for the "Next" pagination link
+        const hasNextPage = $('.pagination .next, .nav-previous a').length > 0;
         
-        return { status: "success", data: items, page };
+        return {
+            status: "success",
+            data: items,
+            hasNextPage
+        };
     } catch (error) {
-        console.error("Error scraping LK21 Search:", error.message);
+        console.error(`Error scraping LK21 Category (${type}):`, error.message);
         return { status: "error", message: error.message };
     }
 };
@@ -129,16 +197,53 @@ const getMovieDetails = async (id) => {
         const synopsis = $('.synopsis, .content-box').text().trim();
         const poster = $('.poster img, .movie-info img').attr('src') || $('meta[property="og:image"]').attr('content');
         
+        const genres = [];
+        $('.tag-list .tag a[href*="/genre/"]').each((i, el) => {
+            genres.push($(el).text().trim());
+        });
+        
         // Extract episodes if it's a series
         const episodes = [];
-        $('.episode-list li, .btn-group a').each((i, el) => {
-            const epLink = $(el).find('a').attr('href') || $(el).attr('href');
-            const epTitle = $(el).text().trim();
-            if (epLink && epTitle) {
-                const epId = epLink.replace(/https?:\/\/[^\/]+/, '').replace(/^\/+/, '').replace(/\/+$/, '');
-                episodes.push({ id: epId, title: epTitle });
+        const seenEps = new Set();
+        
+        // Check if LK21 provides the episode list neatly in JSON format
+        const seasonDataText = $('#season-data').html();
+        if (seasonDataText) {
+            try {
+                const seasonData = JSON.parse(seasonDataText);
+                // seasonData is an object with season numbers as keys: {"1": [...episodes], "2": [...episodes]}
+                for (const seasonNum in seasonData) {
+                    const epArray = seasonData[seasonNum];
+                    epArray.forEach(ep => {
+                        const epId = ep.slug.replace(/https?:\/\/[^\/]+/, '').replace(/^\/+/, '').replace(/\/+$/, '');
+                        if (!seenEps.has(epId)) {
+                            seenEps.add(epId);
+                            // We can format the title to be neat if it's too long, but let's just use their title or fallback
+                            const niceTitle = `Season ${ep.s} Episode ${ep.episode_no}`;
+                            episodes.push({ id: epId, title: niceTitle });
+                        }
+                    });
+                }
+            } catch(e) {
+                console.error("Failed to parse season-data", e);
             }
-        });
+        }
+        
+        // Fallback for older LK21 formats where episodes are just links
+        if (episodes.length === 0) {
+            $('a').each((i, el) => {
+                const epLink = $(el).attr('href');
+                const epTitle = $(el).text().trim();
+                
+                if (epLink && epTitle && (epTitle.toLowerCase().includes('episode') || epTitle.toLowerCase().match(/ep\s?\d+/) || epLink.toLowerCase().includes('episode') || epLink.toLowerCase().includes('-ep-'))) {
+                    const epId = epLink.replace(/https?:\/\/[^\/]+/, '').replace(/^\/+/, '').replace(/\/+$/, '');
+                    if (!seenEps.has(epId) && epId.length > 5 && !epId.startsWith('#') && !epId.startsWith('javascript')) {
+                        seenEps.add(epId);
+                        episodes.push({ id: epId, title: epTitle });
+                    }
+                }
+            });
+        }
         
         // Try to find iframe on this page (if it's a movie)
         const iframe = $('iframe').attr('src');
@@ -149,6 +254,7 @@ const getMovieDetails = async (id) => {
                 title,
                 synopsis,
                 poster,
+                genres,
                 isSeries: episodes.length > 0,
                 episodes,
                 iframe: iframe || null
@@ -161,12 +267,7 @@ const getMovieDetails = async (id) => {
 };
 
 const getMovieStream = async (id) => {
-    // This expects the ID of the exact page (e.g. agent-kim-reactivated-season-1-episode-1-2026)
     try {
-        // We guess the domain is the redirect domain if it's a series episode
-        // For simplicity, let's just search through the known redirect domains or just try the base url
-        // Actually, we can fetch from a proxy or the base domain. But since eps are on the redirect domain,
-        // it's best to fetch via base URL and follow redirect.
         const detailUrl = `${LK21_BASE_URL}/${id}`;
         let { data } = await axios.get(detailUrl, { headers: getHeaders(), httpsAgent: agent });
         let $ = cheerio.load(data);
@@ -178,12 +279,42 @@ const getMovieStream = async (id) => {
             $ = cheerio.load(data);
         }
         
-        const iframe = $('iframe').attr('src');
+        let iframe = $('iframe').attr('src');
+        if (iframe && iframe.startsWith('//')) {
+            iframe = 'https:' + iframe;
+        }
+
+        // Try to bypass ads by fetching the raw .m3u8 from the player's internal API
+        let streamUrl = iframe;
+        if (iframe && (iframe.includes('playeriframe') || iframe.includes('p2p'))) {
+            try {
+                const urlParts = iframe.split('/');
+                const videoId = urlParts[urlParts.length - 1];
+                
+                if (videoId) {
+                    const payload = 'r=' + encodeURIComponent(new URL(iframe).origin + '/') + '&d=cloud.hownetwork.xyz';
+                    const apiRes = await axios.post(`https://cloud.hownetwork.xyz/api2.php?id=${videoId}`, payload, {
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'User-Agent': 'Mozilla/5.0',
+                            'Referer': 'https://cloud.hownetwork.xyz/video.php'
+                        },
+                        httpsAgent: agent
+                    });
+                    
+                    if (apiRes.data && apiRes.data.file) {
+                        streamUrl = apiRes.data.file;
+                    }
+                }
+            } catch (err) {
+                console.log("Failed to extract raw m3u8, falling back to iframe:", err.message);
+            }
+        }
         
         return {
             status: "success",
             data: {
-                iframe
+                iframe: streamUrl
             }
         };
     } catch (error) {
@@ -195,6 +326,7 @@ const getMovieStream = async (id) => {
 export default {
     getHomeData,
     searchMovies,
+    getCategory,
     getMovieDetails,
     getMovieStream
 };
