@@ -2,6 +2,7 @@
 // Scraper AnimeLovers via API animekita.org
 // Ported from aNEETme project
 
+import { Socks5ProxyAgent } from 'undici';
 import { getMapping } from '../utils/mappings.js';
 
 const HEADERS = {
@@ -10,6 +11,19 @@ const HEADERS = {
 };
 
 const BASE = "https://apps.animekita.org/api/v1.2.5";
+
+const ANIMELOVERS_PROXY =
+  process.env.ANIMELOVERS_PROXY || 'socks5://127.0.0.1:40000';
+
+const animeLoversDispatcher =
+  new Socks5ProxyAgent(ANIMELOVERS_PROXY);
+
+function animekitaFetch(url) {
+  return fetch(url, {
+    headers: HEADERS,
+    dispatcher: animeLoversDispatcher,
+  });
+}
 
 const normalizeId = (url) => url ? url.replace("anime/", "") : "";
 
@@ -27,7 +41,7 @@ function parseSafeJson(text) {
 
 export async function searchAnimelovers(query, page = 1) {
   const url = `${BASE}/search.php?keyword=${encodeURIComponent(query)}&page=${page}&per_page=30`;
-  const res = await fetch(url, { headers: HEADERS });
+  const res = await animekitaFetch(url);
   if (!res.ok) throw new Error("Gagal memuat data pencarian AnimeLovers");
   const json = parseSafeJson(await res.text());
   const items = json.data?.[0]?.result || [];
@@ -45,7 +59,7 @@ export async function searchAnimelovers(query, page = 1) {
 
 export async function getInfoAnimelovers(id) {
   const url = `${BASE}/series.php?url=${encodeURIComponent(id)}`;
-  const res = await fetch(url, { headers: HEADERS });
+  const res = await animekitaFetch(url);
   if (!res.ok) throw new Error("Gagal memuat detail AnimeLovers");
   const json = parseSafeJson(await res.text());
   if (!json.data || json.data.length === 0) throw new Error("Data tidak ditemukan");
@@ -72,7 +86,7 @@ export async function getInfoAnimelovers(id) {
 
 export async function getStreamAnimelovers(id) {
   const url = `${BASE}/series/episode/data.php?url=${encodeURIComponent(id)}`;
-  const res = await fetch(url, { headers: HEADERS });
+  const res = await animekitaFetch(url);
   if (!res.ok) throw new Error("Gagal memuat stream AnimeLovers");
   const json = parseSafeJson(await res.text());
   if (!json.data || json.data.length === 0) throw new Error("Video tidak ditemukan");
@@ -97,7 +111,7 @@ export async function getStreamAnimelovers(id) {
           type,
           server: "AnimeLovers"
         });
-        
+
         // MP4 direct links can be used as download links
         if (type === "mp4") {
           downloads.push({
@@ -119,7 +133,7 @@ export async function getStreamAnimelovers(id) {
     const bi = qualityOrder.indexOf(b.quality);
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
   });
-  
+
   downloads.sort((a, b) => {
     const ai = qualityOrder.indexOf(a.quality);
     const bi = qualityOrder.indexOf(b.quality);
@@ -134,13 +148,13 @@ export async function getStreamAnimelovers(id) {
  */
 function calculateMatchScore(anilistData, candidate) {
   let score = 0;
-  
+
   // 1. TITLE MATCH (Max 40)
   const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9\s]/gi, ' ').replace(/\s+/g, ' ').trim();
   const cTitle = normalize(candidate.title);
-  
+
   const allTitles = [...(anilistData.titles || []), ...(anilistData.synonyms || [])];
-  
+
   let bestTitleScore = 0;
   for (const t of allTitles) {
     if (!t) continue;
@@ -269,7 +283,7 @@ export async function getEpisodeStreamByTitle(anilistData, epNum) {
 
   let results = [];
   let query = "";
-  
+
   let titlesToSearch = [anilistData];
   if (typeof anilistData === 'object') {
     const tList = anilistData.titles || [];
@@ -277,7 +291,7 @@ export async function getEpisodeStreamByTitle(anilistData, epNum) {
     // Ambil maksimal 5 variasi judul utama + sinonim untuk dicari
     titlesToSearch = [...tList, ...sList].filter(Boolean).slice(0, 5);
   }
-  
+
   // Helper: bersihkan special chars agar search engine AnimeLovers tidak bingung
   // Contoh: "THE LAST -NARUTO THE MOVIE-" → "THE LAST NARUTO THE MOVIE"
   const cleanForSearch = (s) => s.replace(/[^a-z0-9\s]/gi, ' ').replace(/\s+/g, ' ').trim();
@@ -313,7 +327,7 @@ export async function getEpisodeStreamByTitle(anilistData, epNum) {
   })).sort((a, b) => b.score - a.score);
 
   console.log(`[AL] Candidates for "${query}":`, scored.map(s => `${s.id}(${s.score})`).join(', '));
-  
+
   const topScore = scored[0]?.score ?? 0;
   if (topScore < 20) throw new Error(`Tidak ada hasil yang cocok untuk "${query}" di AnimeLovers (skor terbaik: ${topScore})`);
   const minAcceptable = topScore >= 70 ? 70 : 40;
@@ -364,7 +378,7 @@ export async function getEpisodesByTitle(anilistData) {
 
   let results = [];
   let query = "";
-  
+
   let titlesToSearch = [anilistData];
   if (typeof anilistData === 'object') {
     const tList = anilistData.titles || [];
@@ -372,7 +386,7 @@ export async function getEpisodesByTitle(anilistData) {
     // Ambil maksimal 5 variasi judul utama + sinonim untuk dicari
     titlesToSearch = [...tList, ...sList].filter(Boolean).slice(0, 5);
   }
-  
+
   // Helper: bersihkan special chars agar search engine AnimeLovers tidak bingung
   const cleanForSearch = (s) => s.replace(/[^a-z0-9\s]/gi, ' ').replace(/\s+/g, ' ').trim();
 
@@ -405,7 +419,7 @@ export async function getEpisodesByTitle(anilistData) {
   })).sort((a, b) => b.score - a.score);
 
   console.log(`[AL:episodes] Candidates for "${query}":`, scored.map(s => `${s.id}(${s.score})`).join(', '));
-  
+
   const topScore = scored[0]?.score ?? 0;
   if (topScore < 20) throw new Error(`Tidak ada hasil yang cocok untuk "${query}" di AnimeLovers (skor terbaik: ${topScore})`);
   const minAcceptable = topScore >= 70 ? 70 : 40;
