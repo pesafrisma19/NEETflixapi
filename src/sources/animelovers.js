@@ -15,14 +15,30 @@ const BASE = "https://apps.animekita.org/api/v1.2.5";
 const ANIMELOVERS_PROXY =
   process.env.ANIMELOVERS_PROXY || 'socks5://127.0.0.1:40000';
 
-const animeLoversDispatcher =
-  new Socks5ProxyAgent(ANIMELOVERS_PROXY);
+let animeLoversDispatcher;
+try {
+  if (ANIMELOVERS_PROXY && ANIMELOVERS_PROXY !== 'direct') {
+    animeLoversDispatcher = new Socks5ProxyAgent(ANIMELOVERS_PROXY);
+  }
+} catch (e) {
+  console.warn('[AL] Socks5ProxyAgent init error:', e.message);
+}
 
-function animekitaFetch(url) {
-  return fetch(url, {
-    headers: HEADERS,
-    dispatcher: animeLoversDispatcher,
-  });
+async function animekitaFetch(url) {
+  if (animeLoversDispatcher) {
+    try {
+      return await fetch(url, {
+        headers: HEADERS,
+        dispatcher: animeLoversDispatcher,
+      });
+    } catch (err) {
+      if (err.cause?.code === 'ECONNREFUSED') {
+        return await fetch(url, { headers: HEADERS });
+      }
+      throw err;
+    }
+  }
+  return fetch(url, { headers: HEADERS });
 }
 
 const normalizeId = (url) => url ? url.replace("anime/", "") : "";
@@ -37,6 +53,23 @@ function parseSafeJson(text) {
   else idx = Math.min(start, startArr);
   if (idx === -1) throw new Error("Response bukan JSON valid");
   return JSON.parse(text.slice(idx));
+}
+
+// Normalisasi URL stream: bersihkan ?download dari Pixeldrain dan encode spasi dengan aman
+function sanitizeStreamUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  let url = rawUrl.trim();
+  // Normalize pixeldrain: buang parameter ?download yang memaksa Content-Disposition: attachment
+  url = url.replace(/([?&])download(=[^&#]*)?(&|$)/gi, (match, prefix, val, suffix) => {
+    return suffix === '&' ? prefix : '';
+  }).replace(/\?$/, '');
+  // Encode URL yang mengandung spasi atau karakter khusus dengan aman
+  try {
+    url = encodeURI(url);
+  } catch (e) {
+    url = url.replace(/ /g, '%20');
+  }
+  return url;
 }
 
 export async function searchAnimelovers(query, page = 1) {
@@ -101,13 +134,26 @@ export async function getStreamAnimelovers(id) {
 
   if (streams) {
     for (const [quality, links] of Object.entries(streams)) {
-      const best = links.find(s => s.link && !isBlocked(s.link))
-        || links.find(s => s.link);
-      if (best?.link) {
-        const type = best.link.includes(".m3u8") ? "hls" : "mp4";
+      if (!Array.isArray(links)) continue;
+
+      // Urutkan link: non-blocked (direct CDN) diutamakan, lalu host alternatif (pixeldrain)
+      const sortedLinks = [...links].sort((a, b) => {
+        const aBlocked = a.link ? isBlocked(a.link) : true;
+        const bBlocked = b.link ? isBlocked(b.link) : true;
+        return (aBlocked === bBlocked) ? 0 : aBlocked ? 1 : -1;
+      });
+
+      const seenUrls = new Set();
+      for (const item of sortedLinks) {
+        if (!item?.link) continue;
+        const cleanUrl = sanitizeStreamUrl(item.link);
+        if (!cleanUrl || seenUrls.has(cleanUrl)) continue;
+        seenUrls.add(cleanUrl);
+
+        const type = cleanUrl.includes(".m3u8") ? "hls" : "mp4";
         sources.push({
           quality,
-          url: best.link,
+          url: cleanUrl,
           type,
           server: "AnimeLovers"
         });
@@ -116,7 +162,7 @@ export async function getStreamAnimelovers(id) {
         if (type === "mp4") {
           downloads.push({
             quality,
-            url: best.link,
+            url: cleanUrl,
             size: resoSize[quality] || "Unknown",
             server: "AnimeLovers (Direct)"
           });
